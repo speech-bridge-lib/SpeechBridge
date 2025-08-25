@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video-Translator | Переводчик видео</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .main-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            background: #f8f9ff;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #5a67d8;
+            background: #eef2ff;
+            transform: translateY(-2px);
+        }
+        
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        
+        .upload-text {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            color: #4a5568;
+        }
+        
+        .upload-hint {
+            font-size: 0.9rem;
+            color: #718096;
+            margin-bottom: 20px;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .processing-section {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .status-card {
+            background: #f7fafc;
+            border-radius: 15px;
+            padding: 30px;
+            border-left: 5px solid #667eea;
+        }
+        
+        .status-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #2d3748;
+        }
+        
+        .current-stage {
+            font-size: 1rem;
+            margin-bottom: 15px;
+            color: #4a5568;
+        }
+        
+        .progress-container {
+            margin: 20px 0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: #e2e8f0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s ease;
+            border-radius: 6px;
+        }
+        
+        .progress-text {
+            text-align: center;
+            margin-top: 10px;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .download-section {
+            display: none;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .download-btn {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(72, 187, 120, 0.6);
+        }
+        
+        .error-section {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background: #fed7d7;
+            border: 1px solid #fc8181;
+            border-radius: 10px;
+            color: #c53030;
+        }
+        
+        .error-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .supported-formats {
+            margin-top: 30px;
+            text-align: center;
+            color: #718096;
+            font-size: 0.9rem;
+        }
+        
+        .format-list {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .format-tag {
+            background: #edf2f7;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: #718096;
+            margin-top: 5px;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .main-card {
+                padding: 20px;
+            }
+            
+            .upload-area {
+                padding: 40px 15px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 Video-Translator</h1>
+            <p>Переводчик видео с английского на русский язык</p>
+        </div>
+        
+        <div class="main-card">
+            <!-- Секция загрузки -->
+            <div id="uploadSection">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">Перетащите видеофайл сюда или нажмите для выбора</div>
+                    <div class="upload-hint">Поддерживаются файлы до 500 МБ</div>
+                    <input type="file" id="fileInput" class="file-input" accept="video/*">
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                        Выбрать видео
+                    </button>
+                </div>
+                
+                <div class="supported-formats">
+                    <p>Поддерживаемые форматы:</p>
+                    <div class="format-list">
+                        <span class="format-tag">MP4</span>
+                        <span class="format-tag">AVI</span>
+                        <span class="format-tag">MOV</span>
+                        <span class="format-tag">MKV</span>
+                        <span class="format-tag">WebM</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Секция обработки -->
+            <div id="processingSection" class="processing-section">
+                <div class="status-card">
+                    <div class="status-title">🔄 Обработка видео</div>
+                    <div id="currentStage" class="current-stage">Инициализация...</div>
+                    
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">0%</div>
+                    </div>
+                    
+                    <div class="stats-container">
+                        <div class="stat-item">
+                            <div class="stat-value" id="elapsedTime">0</div>
+                            <div class="stat-label">Секунд прошло</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="estimatedTime">~</div>
+                            <div class="stat-label">Осталось (мин)</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value" id="currentProgress">0</div>
+                            <div class="stat-label">Прогресс %</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Секция скачивания -->
+                <div id="downloadSection" class="download-section">
+                    <div class="status-title">✅ Готово!</div>
+                    <p style="margin-bottom: 20px;">Ваше видео успешно переведено</p>
+                    <a id="downloadBtn" class="download-btn" href="#" download>
+                        📥 Скачать переведенное видео
+                    </a>
+                </div>
+                
+                <!-- Секция ошибок -->
+                <div id="errorSection" class="error-section">
+                    <div class="error-title">❌ Произошла ошибка</div>
+                    <div id="errorMessage"></div>
+                    <button class="upload-btn" style="margin-top: 15px;" onclick="resetUpload()">
+                        Попробовать снова
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Создано с использованием ИИ для распознавания речи, перевода и синтеза</p>
+        </div>
+    </div>
+
+    <script>
+        let currentTaskId = null;
+        let statusCheckInterval = null;
+        let startTime = null;
+
+        // DOM элементы
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.getElementById('uploadArea');
+        const uploadSection = document.getElementById('uploadSection');
+        const processingSection = document.getElementById('processingSection');
+        const downloadSection = document.getElementById('downloadSection');
+        const errorSection = document.getElementById('errorSection');
+        
+        // Элементы прогресса
+        const currentStage = document.getElementById('currentStage');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const elapsedTime = document.getElementById('elapsedTime');
+        const estimatedTime = document.getElementById('estimatedTime');
+        const currentProgress = document.getElementById('currentProgress');
+        const errorMessage = document.getElementById('errorMessage');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // Обработка выбора файла
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        // Drag & Drop
+        uploadArea.addEventListener('dragover', handleDragOver);
+        uploadArea.addEventListener('dragleave', handleDragLeave);
+        uploadArea.addEventListener('drop', handleDrop);
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            document.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        function handleDragOver(e) {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        }
+        
+        function handleDragLeave(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        }
+        
+        function handleDrop(e) {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        }
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                uploadFile(file);
+            }
+        }
+        
+        function uploadFile(file) {
+            // Проверка типа файла
+            const allowedTypes = ['video/mp4', 'video/avi', 'video/mov', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
+            if (!allowedTypes.some(type => file.type.startsWith('video/')) && !file.name.match(/\.(mp4|avi|mov|mkv|webm)$/i)) {
+                showError('Пожалуйста, выберите видеофайл (MP4, AVI, MOV, MKV, WebM)');
+                return;
+            }
+            
+            // Проверка размера файла (500MB)
+            const maxSize = 500 * 1024 * 1024;
+            if (file.size > maxSize) {
+                showError('Размер файла не должен превышать 500 МБ');
+                return;
+            }
+            
+            // Создание FormData
+            const formData = new FormData();
+            formData.append('video', file);
+            
+            // Показываем секцию обработки
+            uploadSection.style.display = 'none';
+            processingSection.style.display = 'block';
+            downloadSection.style.display = 'none';
+            errorSection.style.display = 'none';
+            
+            startTime = Date.now();
+            updateProgress('Загрузка файла...', 0);
+            
+            // Отправка файла
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.task_id) {
+                    currentTaskId = data.task_id;
+                    startStatusCheck();
+                } else {
+                    showError(data.error || 'Ошибка загрузки файла');
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+                showError('Ошибка при загрузке файла: ' + error.message);
+            });
+        }
+        
+        function startStatusCheck() {
+            statusCheckInterval = setInterval(checkStatus, 2000);
+        }
+        
+        function checkStatus() {
+            if (!currentTaskId) return;
+            
+            fetch(`/status/${currentTaskId}`)
+                .then(response => response.json())
+                .then(data => {
+                    updateProgress(data.current_stage, data.progress);
+                    updateStats(data.elapsed_time, data.progress);
+                    
+                    if (data.status === 'completed') {
+                        clearInterval(statusCheckInterval);
+                        showSuccess(data.output_file);
+                    } else if (data.status === 'error') {
+                        clearInterval(statusCheckInterval);
+                        showError(data.error_message || 'Произошла ошибка при обработке');
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка проверки статуса:', error);
+                });
+        }
+        
+        function updateProgress(stage, progress) {
+            currentStage.textContent = stage;
+            progressFill.style.width = progress + '%';
+            progressText.textContent = progress + '%';
+            currentProgress.textContent = progress;
+        }
+        
+        function updateStats(elapsed, progress) {
+            elapsedTime.textContent = elapsed;
+            
+            if (progress > 5) {
+                const totalEstimated = (elapsed / progress) * 100;
+                const remaining = Math.max(0, Math.ceil((totalEstimated - elapsed) / 60));
+                estimatedTime.textContent = remaining;
+            } else {
+                estimatedTime.textContent = '~';
+            }
+        }
+        
+        function showSuccess(outputFile) {
+            downloadSection.style.display = 'block';
+            downloadBtn.href = `/download/${currentTaskId}`;
+        }
+        
+        function showError(message) {
+            uploadSection.style.display = 'none';
+            processingSection.style.display = 'block';
+            downloadSection.style.display = 'none';
+            errorSection.style.display = 'block';
+            errorMessage.textContent = message;
+            
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+            }
+        }
+        
+        function resetUpload() {
+            uploadSection.style.display = 'block';
+            processingSection.style.display = 'none';
+            downloadSection.style.display = 'none';
+            errorSection.style.display = 'none';
+            
+            currentTaskId = null;
+            fileInput.value = '';
+            
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+            }
+        }
+        
+        console.log('🎬 Video-Translator загружен!');
+        console.log('📊 Поддерживаемые форматы: MP4, AVI, MOV, MKV, WebM');
+        console.log('📏 Максимальный размер: 500 МБ');
+    </script>
+</body>
+</html>
