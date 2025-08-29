@@ -701,6 +701,8 @@ if __name__ == "__main__":
     print(f"  SR движки: {[k for k, v in status['speech_recognition_engines'].items() if v]}")
     print(f"  TTS движки: {[k for k, v in status['tts_engines'].items() if v]}")
 
+
+
     # Тест с реальным файлом
     test_file = "test.mp4"
     if Path(test_file).exists():
