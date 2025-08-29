@@ -200,3 +200,152 @@
 2025-08-25 22:26:53,711 - INFO - VideoTranslator инициализирован
 2025-08-25 22:26:53,758 - WARNING -  * Debugger is active!
 2025-08-25 22:26:53,775 - INFO -  * Debugger PIN: 138-304-521
+2025-08-26 23:16:07,049 - __main__ - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-26 23:16:07,049 - __main__ - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-26 23:16:07,944 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-26 23:16:07,968 - __main__ - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-26 23:16:08,725 - __main__ - INFO - Доступные SR движки: Нет
+2025-08-26 23:16:10,293 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-26 23:20:12,596 - video_translator - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-26 23:20:12,597 - video_translator - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-26 23:20:13,306 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-26 23:20:13,316 - video_translator - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-26 23:20:13,891 - video_translator - INFO - Доступные SR движки: Нет
+2025-08-26 23:20:13,897 - web_app - INFO - Запуск Video-Translator на 127.0.0.1:5000
+2025-08-26 23:20:14,001 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-08-26 23:20:14,001 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-08-26 23:20:14,003 - werkzeug - INFO -  * Restarting with stat
+2025-08-26 23:20:14,966 - video_translator - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-26 23:20:14,966 - video_translator - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-26 23:20:15,637 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-26 23:20:15,647 - video_translator - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-26 23:20:16,651 - video_translator - INFO - Доступные SR движки: Нет
+2025-08-26 23:20:16,657 - web_app - INFO - Запуск Video-Translator на 127.0.0.1:5000
+2025-08-26 23:20:16,705 - werkzeug - WARNING -  * Debugger is active!
+2025-08-26 23:20:16,728 - werkzeug - INFO -  * Debugger PIN: 138-304-521
+2025-08-26 23:21:23,604 - video_translator - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-26 23:21:23,605 - video_translator - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-26 23:21:24,292 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-26 23:21:24,306 - video_translator - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-26 23:21:24,780 - video_translator - INFO - Доступные SR движки: Нет
+2025-08-26 23:21:55,637 - video_translator - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-26 23:21:55,638 - video_translator - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-26 23:21:56,604 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-26 23:21:56,618 - video_translator - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-26 23:21:57,292 - video_translator - INFO - Доступные SR движки: Нет
+2025-08-26 23:21:57,301 - web_app - INFO - Запуск Video-Translator на 127.0.0.1:5000
+2025-08-26 23:21:57,449 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-08-26 23:21:57,451 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-08-26 23:21:57,458 - werkzeug - INFO -  * Restarting with stat
+2025-08-26 23:22:00,363 - video_translator - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-26 23:22:00,363 - video_translator - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-26 23:22:00,829 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-26 23:22:00,852 - video_translator - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-26 23:22:01,704 - video_translator - INFO - Доступные SR движки: Нет
+2025-08-26 23:22:01,712 - web_app - INFO - Запуск Video-Translator на 127.0.0.1:5000
+2025-08-26 23:22:01,782 - werkzeug - WARNING -  * Debugger is active!
+2025-08-26 23:22:01,809 - werkzeug - INFO -  * Debugger PIN: 138-304-521
+2025-08-26 23:27:13,868 - video_translator - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-26 23:27:13,869 - video_translator - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-26 23:27:14,828 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-26 23:27:14,846 - video_translator - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-26 23:27:16,120 - video_translator - INFO - Доступные SR движки: Нет
+2025-08-26 23:27:16,127 - video_translator - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-26 23:27:16,128 - video_translator - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-26 23:27:16,929 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-26 23:27:16,942 - video_translator - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-26 23:27:17,751 - video_translator - INFO - Доступные SR движки: Нет
+2025-08-29 14:02:30,624 - __main__ - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-29 14:02:30,624 - __main__ - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-29 14:02:31,473 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-29 14:02:31,490 - __main__ - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-29 14:02:32,128 - __main__ - INFO - Доступные SR движки: Нет
+2025-08-29 14:02:33,384 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-29 14:04:09,557 - __main__ - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-29 14:04:09,558 - __main__ - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-29 14:04:10,268 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-29 14:04:10,279 - __main__ - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-29 14:04:10,877 - __main__ - INFO - Доступные SR движки: Нет
+2025-08-29 14:04:12,333 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-29 14:05:41,047 - video_translator - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-29 14:05:41,048 - video_translator - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-29 14:05:41,612 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-29 14:05:41,630 - video_translator - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-29 14:05:42,278 - video_translator - INFO - Доступные SR движки: Нет
+2025-08-29 14:05:42,284 - web_app - INFO - Запуск Video-Translator на 127.0.0.1:5000
+2025-08-29 14:05:42,411 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-08-29 14:05:42,411 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-08-29 14:05:42,414 - werkzeug - INFO -  * Restarting with stat
+2025-08-29 14:05:43,292 - video_translator - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-29 14:05:43,293 - video_translator - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-29 14:05:43,912 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-29 14:05:43,922 - video_translator - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-29 14:05:44,410 - video_translator - INFO - Доступные SR движки: Нет
+2025-08-29 14:05:44,417 - web_app - INFO - Запуск Video-Translator на 127.0.0.1:5000
+2025-08-29 14:05:44,459 - werkzeug - WARNING -  * Debugger is active!
+2025-08-29 14:05:44,475 - werkzeug - INFO -  * Debugger PIN: 138-304-521
+2025-08-29 14:06:11,787 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:06:11] "[35m[1mGET / HTTP/1.1[0m" 500 -
+2025-08-29 14:06:12,122 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:06:12] "[36mGET /?__debugger__=yes&cmd=resource&f=style.css HTTP/1.1[0m" 304 -
+2025-08-29 14:06:12,122 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:06:12] "[36mGET /?__debugger__=yes&cmd=resource&f=debugger.js HTTP/1.1[0m" 304 -
+2025-08-29 14:06:12,185 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:06:12] "GET /?__debugger__=yes&cmd=resource&f=console.png&s=qo89x9l7gKOBkdFmybWG HTTP/1.1" 200 -
+2025-08-29 14:06:12,230 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:06:12] "[36mGET /?__debugger__=yes&cmd=resource&f=console.png HTTP/1.1[0m" 304 -
+2025-08-29 14:09:09,813 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:09:09] "GET / HTTP/1.1" 200 -
+2025-08-29 14:09:27,598 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:09:27] "[33mPOST /upload HTTP/1.1[0m" 404 -
+2025-08-29 14:09:35,027 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:09:35] "[33mPOST /upload HTTP/1.1[0m" 404 -
+2025-08-29 14:09:49,298 - video_translator - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-29 14:09:49,298 - video_translator - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-29 14:09:49,865 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-29 14:09:49,882 - video_translator - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-29 14:09:50,491 - video_translator - INFO - Доступные SR движки: Нет
+2025-08-29 14:09:50,497 - web_app - INFO - Запуск Video-Translator на 127.0.0.1:5000
+2025-08-29 14:09:50,562 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2025-08-29 14:09:50,563 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2025-08-29 14:09:50,564 - werkzeug - INFO -  * Restarting with stat
+2025-08-29 14:09:51,436 - video_translator - INFO - VideoTranslator инициализирован с модульной архитектурой
+2025-08-29 14:09:51,437 - video_translator - INFO - Переводчик: mock - Демо-переводчик для тестирования
+2025-08-29 14:09:52,437 - core.speech_synthesizer - WARNING - ElevenLabs API ошибка: 401
+2025-08-29 14:09:52,446 - video_translator - INFO - Доступные TTS движки: google_tts, pyttsx3
+2025-08-29 14:09:52,988 - video_translator - INFO - Доступные SR движки: Нет
+2025-08-29 14:09:52,994 - web_app - INFO - Запуск Video-Translator на 127.0.0.1:5000
+2025-08-29 14:09:53,044 - werkzeug - WARNING -  * Debugger is active!
+2025-08-29 14:09:53,061 - werkzeug - INFO -  * Debugger PIN: 138-304-521
+2025-08-29 14:10:02,943 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:10:02] "GET / HTTP/1.1" 200 -
+2025-08-29 14:10:50,381 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:10:50] "[33mPOST /upload HTTP/1.1[0m" 404 -
+2025-08-29 14:11:10,391 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:11:10] "[33mPOST /upload HTTP/1.1[0m" 404 -
+2025-08-29 14:29:55,901 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:29:55] "GET / HTTP/1.1" 200 -
+2025-08-29 14:30:02,718 - web_app - INFO - Начало обработки задачи cd99ab35-9561-420d-b442-68ce34c32d5f
+2025-08-29 14:30:02,719 - video_translator - INFO - Начало перевода видео: /Users/andreykolpakov/Program_Projects/Python/Translator/Video-Translator/uploads/cd99ab35-9561-420d-b442-68ce34c32d5f_2025-08-24_19.53.25.mp4 -> /Users/andreykolpakov/Program_Projects/Python/Translator/Video-Translator/outputs/translated_cd99ab35-9561-420d-b442-68ce34c32d5f.mp4
+2025-08-29 14:30:02,723 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:30:02] "POST /api/upload HTTP/1.1" 200 -
+2025-08-29 14:30:02,885 - video_translator - INFO - Видео информация: 47.6s, (848, 384), 9.2MB
+2025-08-29 14:30:02,886 - core.video_processor - INFO - Извлечение аудио из /Users/andreykolpakov/Program_Projects/Python/Translator/Video-Translator/uploads/cd99ab35-9561-420d-b442-68ce34c32d5f_2025-08-24_19.53.25.mp4
+2025-08-29 14:30:03,340 - core.video_processor - INFO - Аудио успешно извлечено: /Users/andreykolpakov/Program_Projects/Python/Translator/Video-Translator/src/temp/audio_37ad1fd17320440bb78ba6918e37de95.wav
+2025-08-29 14:30:03,340 - core.audio_processor - INFO - Сегментация аудио: /Users/andreykolpakov/Program_Projects/Python/Translator/Video-Translator/src/temp/audio_37ad1fd17320440bb78ba6918e37de95.wav
+2025-08-29 14:30:04,548 - core.audio_processor - INFO - Создано 1 сегментов из аудио длительностью 47.57s
+2025-08-29 14:30:04,549 - video_translator - INFO - Создано 1 аудио сегментов
+2025-08-29 14:30:04,743 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:30:04] "GET /api/status/cd99ab35-9561-420d-b442-68ce34c32d5f HTTP/1.1" 200 -
+2025-08-29 14:30:05,758 - core.speech_recognizer - WARNING - Google SR API ошибка: recognition connection failed: [Errno 32] Broken pipe
+2025-08-29 14:30:05,764 - video_translator - WARNING - Сегмент 1: речь не распознана
+2025-08-29 14:30:05,764 - video_translator - INFO - Обработка сегментов завершена: 0/1 успешно
+2025-08-29 14:30:05,765 - video_translator - INFO - Результаты распознавания сохранены: /Users/andreykolpakov/Program_Projects/Python/Translator/Video-Translator/outputs/cd99ab35-9561-420d-b442-68ce34c32d5f_2025-08-24_19.53.25_recognition_20250829_143005.txt
+2025-08-29 14:30:05,766 - video_translator - INFO - Результаты перевода сохранены: /Users/andreykolpakov/Program_Projects/Python/Translator/Video-Translator/outputs/cd99ab35-9561-420d-b442-68ce34c32d5f_2025-08-24_19.53.25_translation_20250829_143005.txt
+2025-08-29 14:30:05,767 - video_translator - INFO - Полный транскрипт сохранен: /Users/andreykolpakov/Program_Projects/Python/Translator/Video-Translator/outputs/cd99ab35-9561-420d-b442-68ce34c32d5f_2025-08-24_19.53.25_complete_20250829_143005.txt
+2025-08-29 14:30:05,767 - core.video_processor - INFO - Создание финального видео с переведенным аудио...
+2025-08-29 14:30:06,735 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:30:06] "GET /api/status/cd99ab35-9561-420d-b442-68ce34c32d5f HTTP/1.1" 200 -
+2025-08-29 14:30:08,735 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:30:08] "GET /api/status/cd99ab35-9561-420d-b442-68ce34c32d5f HTTP/1.1" 200 -
+2025-08-29 14:30:10,735 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:30:10] "GET /api/status/cd99ab35-9561-420d-b442-68ce34c32d5f HTTP/1.1" 200 -
+2025-08-29 14:30:11,729 - py.warnings - WARNING - /Users/andreykolpakov/Program_Projects/Python/Translator/Video-Translator/venv/lib/python3.13/site-packages/moviepy/video/io/ffmpeg_reader.py:123: UserWarning: Warning: in file /Users/andreykolpakov/Program_Projects/Python/Translator/Video-Translator/uploads/cd99ab35-9561-420d-b442-68ce34c32d5f_2025-08-24_19.53.25.mp4, 976896 bytes wanted but 0 bytes read,at frame 1427/1428, at time 47.57/47.57 sec. Using the last valid frame instead.
+  warnings.warn("Warning: in file %s, "%(self.filename)+
+
+2025-08-29 14:30:11,949 - core.video_processor - INFO - Финальное видео создано: /Users/andreykolpakov/Program_Projects/Python/Translator/Video-Translator/outputs/translated_cd99ab35-9561-420d-b442-68ce34c32d5f.mp4
+2025-08-29 14:30:11,950 - video_translator - INFO - Перевод видео завершен за 9.2s: успешно
+2025-08-29 14:30:11,950 - video_translator - INFO - Сохранены текстовые файлы:
+2025-08-29 14:30:11,950 - video_translator - INFO -   - Recognition: cd99ab35-9561-420d-b442-68ce34c32d5f_2025-08-24_19.53.25_recognition_20250829_143005.txt
+2025-08-29 14:30:11,951 - video_translator - INFO -   - Translation: cd99ab35-9561-420d-b442-68ce34c32d5f_2025-08-24_19.53.25_translation_20250829_143005.txt
+2025-08-29 14:30:11,951 - video_translator - INFO -   - Transcript: cd99ab35-9561-420d-b442-68ce34c32d5f_2025-08-24_19.53.25_complete_20250829_143005.txt
+2025-08-29 14:30:11,951 - web_app - INFO - Задача cd99ab35-9561-420d-b442-68ce34c32d5f завершена успешно
+2025-08-29 14:30:12,735 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:30:12] "GET /api/status/cd99ab35-9561-420d-b442-68ce34c32d5f HTTP/1.1" 200 -
+2025-08-29 14:30:20,692 - werkzeug - INFO - 127.0.0.1 - - [29/Aug/2025 14:30:20] "GET /api/download/cd99ab35-9561-420d-b442-68ce34c32d5f HTTP/1.1" 200 -

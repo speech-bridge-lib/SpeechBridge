@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
 VideoTranslator: Обновленный основной класс для перевода видео
-Использует модульную архитектуру core компонентов
+Использует модульную архитектуру core компонентов + сохранение текстов
 """
 
 import logging
 import time
 from typing import Optional, Dict, List, Callable
+import json
+from datetime import datetime
 from pathlib import Path
 
 # Core модули
@@ -62,14 +64,259 @@ class VideoTranslator:
         available_sr = [name for name, available in sr_engines.items() if available]
         self.logger.info(f"Доступные SR движки: {', '.join(available_sr) if available_sr else 'Нет'}")
 
-    def translate_video(self, video_path: str, output_path: str, progress_callback: Callable = None) -> bool:
+    def _format_time(self, seconds: float) -> str:
+        """Форматирование времени в MM:SS или HH:MM:SS"""
+        total_seconds = int(seconds)
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        secs = total_seconds % 60
+
+        if hours > 0:
+            return f"{hours}:{minutes:02d}:{secs:02d}"
+        else:
+            return f"{minutes}:{secs:02d}"
+
+    def save_recognition_results(self, video_path: str, segments: List[Dict], output_dir: str = None) -> str:
         """
-        Основная функция перевода видео с использованием всех модулей
+        Сохранение результатов распознавания речи
+
+        Args:
+            video_path: путь к исходному видео
+            segments: список сегментов с распознанным текстом
+            output_dir: директория для сохранения (по умолчанию outputs/)
+
+        Returns:
+            str: путь к сохраненному файлу
+        """
+        try:
+            if output_dir is None:
+                output_dir = self.config.OUTPUT_FOLDER
+
+            # Создание имени файла на основе видео
+            video_name = Path(video_path).stem
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_file = Path(output_dir) / f"{video_name}_recognition_{timestamp}.txt"
+
+            # Подготовка данных для сохранения
+            recognition_data = {
+                'source_video': str(Path(video_path).name),
+                'processing_date': datetime.now().isoformat(),
+                'total_segments': len(segments),
+                'segments': []
+            }
+
+            # Текстовый вывод для удобного чтения
+            text_content = []
+            text_content.append(f"РАСПОЗНАВАНИЕ РЕЧИ")
+            text_content.append(f"Видео: {Path(video_path).name}")
+            text_content.append(f"Дата обработки: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
+            text_content.append(f"Всего сегментов: {len(segments)}")
+            text_content.append("=" * 60)
+            text_content.append("")
+
+            for segment in segments:
+                segment_info = {
+                    'id': segment.get('id', 0),
+                    'start_time': segment.get('start_time', 0),
+                    'end_time': segment.get('end_time', 0),
+                    'duration': segment.get('duration', 0),
+                    'text': segment.get('original_text', ''),
+                    'status': 'recognized' if segment.get('original_text') else 'no_speech'
+                }
+                recognition_data['segments'].append(segment_info)
+
+                # Форматированный текстовый вывод
+                start_time = segment.get('start_time', 0)
+                end_time = segment.get('end_time', 0)
+                original_text = segment.get('original_text', '[речь не распознана]')
+
+                text_content.append(f"[{self._format_time(start_time)} - {self._format_time(end_time)}]")
+                text_content.append(f"{original_text}")
+                text_content.append("")
+
+            # Сохранение текстового файла
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(text_content))
+
+            # Сохранение JSON файла для программного доступа
+            json_file = output_file.with_suffix('.json')
+            with open(json_file, 'w', encoding='utf-8') as f:
+                json.dump(recognition_data, f, ensure_ascii=False, indent=2)
+
+            self.logger.info(f"Результаты распознавания сохранены: {output_file}")
+            return str(output_file)
+
+        except Exception as e:
+            self.logger.error(f"Ошибка сохранения результатов распознавания: {e}")
+            return ""
+
+    def save_translation_results(self, video_path: str, segments: List[Dict], output_dir: str = None) -> str:
+        """
+        Сохранение результатов перевода
+
+        Args:
+            video_path: путь к исходному видео
+            segments: список сегментов с переведенным текстом
+            output_dir: директория для сохранения (по умолчанию outputs/)
+
+        Returns:
+            str: путь к сохраненному файлу
+        """
+        try:
+            if output_dir is None:
+                output_dir = self.config.OUTPUT_FOLDER
+
+            # Создание имени файла
+            video_name = Path(video_path).stem
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_file = Path(output_dir) / f"{video_name}_translation_{timestamp}.txt"
+
+            # Подготовка данных
+            translation_data = {
+                'source_video': str(Path(video_path).name),
+                'processing_date': datetime.now().isoformat(),
+                'source_language': self.config.SOURCE_LANGUAGE,
+                'target_language': self.config.TARGET_LANGUAGE,
+                'translator_type': self.get_translator_status()['type'],
+                'total_segments': len(segments),
+                'segments': []
+            }
+
+            # Текстовый вывод
+            text_content = []
+            text_content.append(f"ПЕРЕВОД ТЕКСТА")
+            text_content.append(f"Видео: {Path(video_path).name}")
+            text_content.append(f"Дата обработки: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
+            text_content.append(f"Направление перевода: {self.config.SOURCE_LANGUAGE} → {self.config.TARGET_LANGUAGE}")
+            text_content.append(f"Переводчик: {self.get_translator_status()['type']}")
+            text_content.append(f"Всего сегментов: {len(segments)}")
+            text_content.append("=" * 60)
+            text_content.append("")
+
+            for segment in segments:
+                segment_info = {
+                    'id': segment.get('id', 0),
+                    'start_time': segment.get('start_time', 0),
+                    'end_time': segment.get('end_time', 0),
+                    'duration': segment.get('duration', 0),
+                    'original_text': segment.get('original_text', ''),
+                    'translated_text': segment.get('translated_text', ''),
+                    'status': segment.get('status', 'unknown')
+                }
+                translation_data['segments'].append(segment_info)
+
+                # Форматированный вывод
+                start_time = segment.get('start_time', 0)
+                end_time = segment.get('end_time', 0)
+                original_text = segment.get('original_text', '[нет текста]')
+                translated_text = segment.get('translated_text', '[нет перевода]')
+
+                text_content.append(f"[{self._format_time(start_time)} - {self._format_time(end_time)}]")
+                text_content.append(f"EN: {original_text}")
+                text_content.append(f"RU: {translated_text}")
+                text_content.append("")
+
+            # Сохранение файлов
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(text_content))
+
+            json_file = output_file.with_suffix('.json')
+            with open(json_file, 'w', encoding='utf-8') as f:
+                json.dump(translation_data, f, ensure_ascii=False, indent=2)
+
+            self.logger.info(f"Результаты перевода сохранены: {output_file}")
+            return str(output_file)
+
+        except Exception as e:
+            self.logger.error(f"Ошибка сохранения результатов перевода: {e}")
+            return ""
+
+    def save_complete_transcript(self, video_path: str, segments: List[Dict], output_dir: str = None) -> str:
+        """
+        Сохранение полного транскрипта (оригинал + перевод + временные метки)
+
+        Args:
+            video_path: путь к исходному видео
+            segments: список сегментов с полной информацией
+            output_dir: директория для сохранения
+
+        Returns:
+            str: путь к сохраненному файлу
+        """
+        try:
+            if output_dir is None:
+                output_dir = self.config.OUTPUT_FOLDER
+
+            video_name = Path(video_path).stem
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_file = Path(output_dir) / f"{video_name}_complete_{timestamp}.txt"
+
+            # Статистика
+            total_segments = len(segments)
+            successful_segments = sum(1 for s in segments if s.get('original_text'))
+            translated_segments = sum(1 for s in segments if s.get('translated_text'))
+
+            text_content = []
+            text_content.append(f"ПОЛНЫЙ ТРАНСКРИПТ И ПЕРЕВОД")
+            text_content.append(f"Видео: {Path(video_path).name}")
+            text_content.append(f"Дата обработки: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
+            text_content.append(
+                f"Общая длительность: {self._format_time(segments[-1].get('end_time', 0)) if segments else '0:00'}")
+            text_content.append(f"Всего сегментов: {total_segments}")
+            text_content.append(
+                f"Распознано: {successful_segments} ({successful_segments / total_segments * 100:.1f}%)")
+            text_content.append(
+                f"Переведено: {translated_segments} ({translated_segments / total_segments * 100:.1f}%)")
+            text_content.append("=" * 80)
+            text_content.append("")
+
+            for i, segment in enumerate(segments, 1):
+                start_time = segment.get('start_time', 0)
+                end_time = segment.get('end_time', 0)
+                duration = segment.get('duration', 0)
+                original_text = segment.get('original_text', '')
+                translated_text = segment.get('translated_text', '')
+                status = segment.get('status', 'unknown')
+
+                text_content.append(f"СЕГМЕНТ {i}")
+                text_content.append(
+                    f"Время: {self._format_time(start_time)} - {self._format_time(end_time)} ({duration:.1f}s)")
+                text_content.append(f"Статус: {status}")
+
+                if original_text:
+                    text_content.append(f"EN: {original_text}")
+                else:
+                    text_content.append(f"EN: [речь не распознана]")
+
+                if translated_text:
+                    text_content.append(f"RU: {translated_text}")
+                else:
+                    text_content.append(f"RU: [нет перевода]")
+
+                text_content.append("-" * 40)
+                text_content.append("")
+
+            # Сохранение
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(text_content))
+
+            self.logger.info(f"Полный транскрипт сохранен: {output_file}")
+            return str(output_file)
+
+        except Exception as e:
+            self.logger.error(f"Ошибка сохранения полного транскрипта: {e}")
+            return ""
+
+    def translate_video(self, video_path: str, output_path: str, progress_callback: Callable = None,
+                        save_texts: bool = True) -> bool:
+        """
+        Основная функция перевода видео с сохранением текстов
 
         Args:
             video_path: путь к исходному видео
             output_path: путь для сохранения результата
             progress_callback: функция для отслеживания прогресса
+            save_texts: сохранять ли текстовые результаты
 
         Returns:
             bool: True при успехе, False при ошибке
@@ -122,7 +369,7 @@ class VideoTranslator:
             for i, segment in enumerate(segments):
                 try:
                     # Обновление прогресса
-                    progress = 20 + (i / total_segments) * 60
+                    progress = 20 + (i / total_segments) * 50
                     if progress_callback:
                         progress_callback(f"Обработка сегмента {i + 1}/{total_segments}", int(progress))
 
@@ -201,21 +448,51 @@ class VideoTranslator:
             # Статистика обработки
             self.logger.info(f"Обработка сегментов завершена: {successful_segments}/{total_segments} успешно")
 
+            # 4. Сохранение текстовых результатов
+            if save_texts and progress_callback:
+                progress_callback("Сохранение текстовых результатов", 75)
+
+            saved_files = []
+            if save_texts:
+                try:
+                    # Сохранение результатов распознавания
+                    recognition_file = self.save_recognition_results(video_path, translated_segments)
+                    if recognition_file:
+                        saved_files.append(('recognition', recognition_file))
+
+                    # Сохранение результатов перевода
+                    translation_file = self.save_translation_results(video_path, translated_segments)
+                    if translation_file:
+                        saved_files.append(('translation', translation_file))
+
+                    # Сохранение полного транскрипта
+                    transcript_file = self.save_complete_transcript(video_path, translated_segments)
+                    if transcript_file:
+                        saved_files.append(('transcript', transcript_file))
+
+                except Exception as e:
+                    self.logger.error(f"Ошибка сохранения текстовых файлов: {e}")
+
             if progress_callback:
                 progress_callback("Создание финального видео", 85)
 
-            # 4. Создание финального видео
+            # 5. Создание финального видео
             success = self.video_processor.create_final_video(video_path, translated_segments, output_path)
 
             if progress_callback:
                 progress_callback("Завершено" if success else "Ошибка создания видео", 100 if success else 0)
 
-            # 5. Очистка временных файлов
+            # 6. Очистка временных файлов
             self._cleanup_translation_files(audio_path, segments, translated_segments)
 
             # Финальная статистика
             total_time = time.time() - start_time
             self.logger.info(f"Перевод видео завершен за {total_time:.1f}s: {'успешно' if success else 'с ошибкой'}")
+
+            if success and save_texts:
+                self.logger.info(f"Сохранены текстовые файлы:")
+                for file_type, file_path in saved_files:
+                    self.logger.info(f"  - {file_type.title()}: {Path(file_path).name}")
 
             return success
 
@@ -402,6 +679,23 @@ if __name__ == "__main__":
 
     # Статус системы
     status = translator.get_system_status()
+    print(f"  Переводчик: {status['translator']['type']}")
+    print(f"  SR движки: {[k for k, v in status['speech_recognition_engines'].items() if v]}")
+    print(f"  TTS движки: {[k for k, v in status['tts_engines'].items() if v]}")
+
+    # Тест с реальным файлом
+    test_file = "test.mp4"
+    if Path(test_file).exists():
+        validation = translator.validate_video_file(test_file)
+        print(f"Валидация {test_file}: {validation}")
+
+        if validation['valid']:
+            estimates = translator.get_processing_estimate(test_file)
+            print(f"Оценка времени обработки: {estimates.get('total', 0):.1f}s")
+    else:
+        print(f"Тестовый файл {test_file} не найден")
+
+    print("Тестирование завершено")
     print(f"Статус системы:")
     print(f"  Переводчик: {status['translator']['type']}")
     print(f"  SR движки: {[k for k, v in status['speech_recognition_engines'].items() if v]}")
@@ -413,7 +707,10 @@ if __name__ == "__main__":
         validation = translator.validate_video_file(test_file)
         print(f"Валидация {test_file}: {validation}")
 
+        if validation['valid']:
+            estimates = translator.get_processing_estimate(test_file)
+            print(f"Оценка времени обработки: {estimates.get('total', 0):.1f}s")
     else:
         print(f"Тестовый файл {test_file} не найден")
 
-    print("Тестирование завершено")
+print("Тестирование завершено")
