@@ -28,164 +28,100 @@ class SpeechSynthesizer:
         self.default_voice = self.config.TTS_VOICE
         
         self.logger.debug("SpeechSynthesizer инициализирован")
-    
+
     def synthesize_speech(
-        self, 
-        text: str, 
-        language: str = None, 
-        voice: str = None, 
-        speed: float = 1.0,
-        pitch: float = 0.0
+            self,
+            text: str,
+            language: str = None,
+            voice: str = None,
+            speed: float = 1.0,
+            pitch: float = 0.0
     ) -> Optional[str]:
         """
-        Синтез речи из текста с fallback стратегией
-        
-        Args:
-            text: текст для синтеза
-            language: код языка
-            voice: голос для синтеза
-            speed: скорость речи (0.5 - 2.0)
-            pitch: высота тона (-20.0 - 20.0)
-            
-        Returns:
-            str: путь к аудио файлу или None при ошибке
+        Синтез речи ТОЛЬКО через macOS 'say' команду с голосом Milena
         """
         if not text or not text.strip():
             self.logger.debug("Пустой текст для синтеза")
             return None
-        
+
         language = language or self.default_language
-        voice = voice or self.default_voice
-        
+
         try:
-            self.logger.debug(f"Синтез речи: '{text[:50]}...' (lang={language}, voice={voice})")
-            
-            # Попытка синтеза через ElevenLabs (высокое качество)
-            result = self._synthesize_with_elevenlabs(text, voice, speed)
+            self.logger.info(f"🎤 Синтез речи через Milena: '{text[:50]}...'")
+
+            # Прямое использование macOS 'say' с голосом Milena
+            result = self._synthesize_with_say_milena(text, language)
+
             if result:
-                self.logger.debug("ElevenLabs TTS успешно")
+                self.logger.info("✅ Использован macOS 'say' с голосом Milena")
                 return result
-            
-            # Fallback на Google TTS
-            result = self._synthesize_with_google_tts(text, language, speed < 1.0)
-            if result:
-                self.logger.debug("Google TTS успешно")
-                return result
-            
-            # Fallback на локальные TTS движки
-            result = self._synthesize_with_local_tts(text, language, speed, pitch)
-            if result:
-                self.logger.debug("Локальный TTS успешно")
-                return result
-            
-            self.logger.warning("Все методы синтеза речи неудачны")
-            return None
-            
-        except Exception as e:
-            self.logger.error(f"Ошибка синтеза речи: {e}")
-            return None
-    
-    def _synthesize_with_elevenlabs(
-        self, 
-        text: str, 
-        voice_id: str = None, 
-        speed: float = 1.0
-    ) -> Optional[str]:
-        """
-        Синтез речи через ElevenLabs API
-        
-        Args:
-            text: текст для синтеза
-            voice_id: ID голоса ElevenLabs
-            speed: скорость речи
-            
-        Returns:
-            str: путь к аудио файлу или None при ошибке
-        """
-        try:
-            api_key = self.config.ELEVENLABS_API_KEY
-            
-            if not api_key or api_key == "your_elevenlabs_api_key":
-                return None
-            
-            import requests
-            import json
-            
-            # Настройка голоса по умолчанию
-            if not voice_id:
-                voice_id = "21m00Tcm4TlvDq8ikWAM"  # Rachel voice
-            
-            url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-            
-            headers = {
-                "Accept": "audio/mpeg",
-                "Content-Type": "application/json",
-                "xi-api-key": api_key
-            }
-            
-            data = {
-                "text": text,
-                "model_id": "eleven_multilingual_v2",
-                "voice_settings": {
-                    "stability": 0.5,
-                    "similarity_boost": 0.8,
-                    "style": 0.0,
-                    "use_speaker_boost": True
-                }
-            }
-            
-            response = requests.post(url, json=data, headers=headers, timeout=30)
-            
-            if response.status_code == 200:
-                output_path = self.config.get_temp_filename("elevenlabs_tts", ".mp3")
-                
-                with open(output_path, 'wb') as f:
-                    f.write(response.content)
-                
-                self.logger.debug(f"ElevenLabs TTS сохранен: {output_path}")
-                return str(output_path)
             else:
-                self.logger.warning(f"ElevenLabs API ошибка: {response.status_code}")
+                self.logger.error("❌ macOS 'say' команда недоступна")
                 return None
-                
-        except ImportError:
-            self.logger.debug("requests не установлен для ElevenLabs")
-            return None
+
         except Exception as e:
-            self.logger.warning(f"ElevenLabs TTS ошибка: {e}")
+            self.logger.error(f"Критическая ошибка синтеза речи: {e}")
             return None
+
+    # def synthesize_speech(
+    #     self,
+    #     text: str,
+    #     language: str = None,
+    #     voice: str = None,
+    #     speed: float = 1.0,
+    #     pitch: float = 0.0
+    # ) -> Optional[str]:
+    #     """
+    #     Синтез речи из текста с fallback стратегией
+    #
+    #     Args:
+    #         text: текст для синтеза
+    #         language: код языка
+    #         voice: голос для синтеза
+    #         speed: скорость речи (0.5 - 2.0)
+    #         pitch: высота тона (-20.0 - 20.0)
+    #
+    #     Returns:
+    #         str: путь к аудио файлу или None при ошибке
+    #     """
+    #     if not text or not text.strip():
+    #         self.logger.debug("Пустой текст для синтеза")
+    #         return None
+    #
+    #     language = language or self.default_language
+    #     voice = voice or self.default_voice
+    #
+    #     try:
+    #         self.logger.debug(f"Синтез речи: '{text[:50]}...' (lang={language}, voice={voice})")
+    #
+    #         # Попытка синтеза через ElevenLabs (высокое качество)
+    #         result = self._synthesize_with_elevenlabs(text, voice, speed)
+    #         if result:
+    #             self.logger.debug("ElevenLabs TTS успешно")
+    #             return result
+    #
+    #         # Fallback на Google TTS
+    #         result = self._synthesize_with_google_tts(text, language, speed < 1.0)
+    #         if result:
+    #             self.logger.debug("Google TTS успешно")
+    #             return result
+    #
+    #         # Fallback на локальные TTS движки
+    #         result = self._synthesize_with_local_tts(text, language, speed, pitch)
+    #         if result:
+    #             self.logger.debug("Локальный TTS успешно")
+    #             return result
+    #
+    #         self.logger.warning("Все методы синтеза речи неудачны")
+    #         return None
+    #
+    #     except Exception as e:
+    #         self.logger.error(f"Ошибка синтеза речи: {e}")
+    #         return None
     
-    def _synthesize_with_google_tts(
-        self, 
-        text: str, 
-        language: str, 
-        slow: bool = False
-    ) -> Optional[str]:
-        """
-        Синтез речи через Google Text-to-Speech
-        
-        Args:
-            text: текст для синтеза
-            language: код языка
-            slow: медленная речь
-            
-        Returns:
-            str: путь к аудио файлу или None при ошибке
-        """
-        try:
-            # Создание объекта gTTS
-            tts = gTTS(text=text, lang=language, slow=slow)
-            
-            # Сохранение в временный файл
-            output_path = self.config.get_temp_filename("google_tts", ".mp3")
-            tts.save(str(output_path))
-            
-            self.logger.debug(f"Google TTS сохранен: {output_path}")
-            return str(output_path)
-            
-        except Exception as e:
-            self.logger.warning(f"Google TTS ошибка: {e}")
-            return None
+    # ElevenLabs API удален - используем только локальные TTS движки
+    
+    # Google TTS удален - используем только локальные TTS движки
     
     def _synthesize_with_local_tts(
         self, 
@@ -223,51 +159,466 @@ class SpeechSynthesizer:
                 continue
         
         return None
-    
+
     def _try_pyttsx3(self, text: str, language: str, speed: float, pitch: float) -> Optional[str]:
-        """Попытка синтеза через pyttsx3"""
+        """Синтез речи через pyttsx3 с улучшенной поддержкой русского"""
         try:
             import pyttsx3
-            
+
             engine = pyttsx3.init()
-            
-            # Настройка параметров
+
+            # Получаем все доступные голоса
             voices = engine.getProperty('voices')
-            
-            # Поиск подходящего голоса для языка
-            target_voice = None
+            self.logger.debug(f"Найдено голосов: {len(voices)}")
+
+            # Поиск русского голоса
+            russian_voice = None
             for voice in voices:
-                if language.startswith('ru') and ('ru' in voice.id.lower() or 'russian' in voice.name.lower()):
-                    target_voice = voice.id
+                self.logger.debug(f"Голос: {voice.name}, ID: {voice.id}")
+                if language.startswith('ru') and any(marker in voice.id.lower() for marker in ['ru', 'russian']):
+                    russian_voice = voice.id
                     break
-                elif language.startswith('en') and ('en' in voice.id.lower() or 'english' in voice.name.lower()):
-                    target_voice = voice.id
-                    break
-            
-            if target_voice:
-                engine.setProperty('voice', target_voice)
-            
-            # Настройка скорости (обычно 150-250 слов в минуту)
-            rate = int(200 * speed)
+
+            # Устанавливаем голос если найден
+            if russian_voice:
+                engine.setProperty('voice', russian_voice)
+                self.logger.debug(f"Установлен русский голос: {russian_voice}")
+            else:
+                self.logger.warning("Русский голос не найден, используем по умолчанию")
+
+            # Настройка параметров
+            rate = max(100, min(300, int(200 * speed)))  # 100-300 слов в минуту
             engine.setProperty('rate', rate)
-            
-            # Настройка громкости
             engine.setProperty('volume', 1.0)
-            
-            # Сохранение в файл
+
+            # Генерация уникального имени файла
             output_path = self.config.get_temp_filename("pyttsx3_tts", ".wav")
+
+            # Синтез и сохранение
             engine.save_to_file(text, str(output_path))
             engine.runAndWait()
-            
-            if Path(output_path).exists() and Path(output_path).stat().st_size > 0:
-                return str(output_path)
-            
-            return None
-            
+
+            # Проверяем, что файл создался
+            if Path(output_path).exists() and Path(output_path).stat().st_size > 100:
+                self.logger.info(f"pyttsx3 создал файл: {output_path}")
+                
+                # ИСПРАВЛЕНИЕ: pyttsx3 на macOS создает AIFF файлы с расширением .wav
+                # Конвертируем в настоящий WAV для совместимости с pydub
+                try:
+                    import subprocess
+                    fixed_path = self.config.get_temp_filename("pyttsx3_fixed", ".wav")
+                    
+                    cmd = [
+                        'ffmpeg', '-f', 'aiff', '-i', str(output_path),
+                        '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '1',
+                        '-af', 'volume=20dB', '-y', str(fixed_path)
+                    ]
+                    
+                    self.logger.info(f"Выполняем FFmpeg команду: {' '.join(cmd)}")
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    
+                    if result.returncode == 0 and Path(fixed_path).stat().st_size > 1000:
+                        self.logger.info(f"pyttsx3 файл исправлен: {fixed_path}")
+                        # Удаляем оригинальный AIFF файл только если конвертация успешна
+                        try:
+                            Path(output_path).unlink()
+                        except:
+                            pass
+                        return str(fixed_path)
+                    else:
+                        self.logger.error(f"FFmpeg конвертация неудачна: {result.stderr}")
+                        self.logger.error(f"Размер выходного файла: {Path(fixed_path).stat().st_size if Path(fixed_path).exists() else 'не существует'}")
+                        # Попробуем альтернативную конвертацию
+                        return self._alternative_conversion(output_path)
+                        
+                except Exception as e:
+                    self.logger.warning(f"Ошибка конвертации pyttsx3 файла: {e}")
+                    return str(output_path)  # Возвращаем как есть
+            else:
+                self.logger.warning("pyttsx3 не создал аудио файл")
+                return None
+
         except ImportError:
+            self.logger.error("pyttsx3 не установлен")
             return None
-        except Exception:
+        except Exception as e:
+            self.logger.error(f"pyttsx3 ошибка: {e}")
             return None
+    
+    def _alternative_conversion(self, aiff_path: str) -> str:
+        """Альтернативная конвертация AIFF файлов"""
+        try:
+            import subprocess
+            alt_path = self.config.get_temp_filename("pyttsx3_alt", ".wav")
+            
+            # Пытаемся различные подходы конвертации
+            conversion_attempts = [
+                # Попытка 1: принудительная конвертация с нормализацией
+                [
+                    'ffmpeg', '-f', 'aiff', '-i', str(aiff_path),
+                    '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '1',
+                    '-filter:a', 'loudnorm', '-y', str(alt_path)
+                ],
+                # Попытка 2: без фильтров, только базовая конвертация
+                [
+                    'ffmpeg', '-i', str(aiff_path),
+                    '-acodec', 'pcm_s16le', '-ar', '44100', '-ac', '1',
+                    '-y', str(alt_path)
+                ],
+                # Попытка 3: попробуем через sox если доступен
+                [
+                    'sox', str(aiff_path), str(alt_path), 'gain', '20'
+                ]
+            ]
+            
+            for i, cmd in enumerate(conversion_attempts):
+                try:
+                    self.logger.info(f"Попытка {i+1} альтернативной конвертации: {' '.join(cmd[:3])}")
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    
+                    if result.returncode == 0 and Path(alt_path).exists() and Path(alt_path).stat().st_size > 1000:
+                        self.logger.info(f"Альтернативная конвертация успешна: {alt_path}")
+                        return str(alt_path)
+                    else:
+                        self.logger.warning(f"Попытка {i+1} неудачна: {result.stderr}")
+                        
+                except FileNotFoundError:
+                    self.logger.debug(f"Команда {cmd[0]} не найдена")
+                    continue
+                except Exception as e:
+                    self.logger.debug(f"Попытка {i+1} ошибка: {e}")
+                    continue
+            
+            # Если все попытки неудачны, возвращаем оригинал
+            self.logger.warning("Все попытки конвертации неудачны, возвращаем оригинальный файл")
+            return str(aiff_path)
+            
+        except Exception as e:
+            self.logger.error(f"Ошибка альтернативной конвертации: {e}")
+            return str(aiff_path)
+
+    def _synthesize_with_espeak_direct(self, text: str, language: str, speed: float) -> Optional[str]:
+        """Прямой синтез через eSpeak с созданием совместимых WAV файлов"""
+        try:
+            import subprocess
+            
+            # Проверка наличия eSpeak
+            result = subprocess.run(['which', 'espeak'], capture_output=True)
+            if result.returncode != 0:
+                self.logger.debug("eSpeak не найден")
+                return None
+            
+            output_path = self.config.get_temp_filename("espeak_tts", ".wav")
+            
+            # Настройка параметров для русского языка
+            lang_code = 'ru' if language.startswith('ru') else 'en'
+            speed_wpm = int(150 * speed) if speed else 150
+            
+            # eSpeak команда для создания WAV файла
+            cmd = [
+                'espeak', '-v', lang_code, '-s', str(speed_wpm),
+                '-w', str(output_path), text
+            ]
+            
+            self.logger.info(f"Выполняем eSpeak: {' '.join(cmd[:5])}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0 and Path(output_path).exists() and Path(output_path).stat().st_size > 100:
+                self.logger.info(f"eSpeak создал файл: {output_path}")
+                return str(output_path)
+            else:
+                self.logger.warning(f"eSpeak неудача: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            self.logger.debug(f"eSpeak ошибка: {e}")
+            return None
+
+    def _synthesize_with_festival_direct(self, text: str, language: str) -> Optional[str]:
+        """Прямой синтез через Festival с созданием совместимых WAV файлов"""
+        try:
+            import subprocess
+            
+            # Проверка наличия Festival
+            result = subprocess.run(['which', 'festival'], capture_output=True)
+            if result.returncode != 0:
+                self.logger.debug("Festival не найден")
+                return None
+            
+            output_path = self.config.get_temp_filename("festival_tts", ".wav")
+            
+            # Создание скрипта для Festival с сохранением в WAV
+            script_content = f'''
+(set! text "{text}")
+(set! utt (SayText text))
+(utt.save.wave utt "{output_path}" 'riff)
+'''
+            
+            script_path = self.config.get_temp_filename("festival_script", ".scm")
+            with open(script_path, 'w', encoding='utf-8') as f:
+                f.write(script_content)
+            
+            cmd = ['festival', '-b', str(script_path)]
+            
+            self.logger.info(f"Выполняем Festival: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            # Очистка временного скрипта
+            try:
+                Path(script_path).unlink()
+            except:
+                pass
+            
+            if result.returncode == 0 and Path(output_path).exists() and Path(output_path).stat().st_size > 100:
+                self.logger.info(f"Festival создал файл: {output_path}")
+                return str(output_path)
+            else:
+                self.logger.warning(f"Festival неудача: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            self.logger.debug(f"Festival ошибка: {e}")
+            return None
+
+    def _try_pyttsx3_improved(self, text: str, language: str, speed: float, pitch: float) -> Optional[str]:
+        """Улучшенный синтез через pyttsx3 с Python-конвертацией"""
+        try:
+            self.logger.info(f"🎯 Начинаем pyttsx3 синтез: '{text[:30]}...'")
+            
+            import pyttsx3
+
+            engine = pyttsx3.init()
+
+            # Получаем все доступные голоса
+            voices = engine.getProperty('voices')
+            self.logger.info(f"🎤 pyttsx3: найдено {len(voices)} голосов")
+
+            # Поиск русского голоса
+            russian_voice = None
+            for voice in voices:
+                if language.startswith('ru') and any(marker in voice.id.lower() for marker in ['ru', 'russian']):
+                    russian_voice = voice.id
+                    self.logger.info(f"🇷🇺 Найден русский голос: {voice.name}")
+                    break
+
+            # Устанавливаем голос если найден
+            if russian_voice:
+                engine.setProperty('voice', russian_voice)
+                self.logger.info(f"✅ Установлен русский голос: {russian_voice}")
+            else:
+                self.logger.warning("⚠️ Русский голос не найден, используем по умолчанию")
+
+            # Настройка параметров
+            rate = max(100, min(300, int(200 * speed)))  # 100-300 слов в минуты
+            engine.setProperty('rate', rate)
+            engine.setProperty('volume', 1.0)
+            self.logger.info(f"⚙️ Параметры: скорость={rate}, громкость=1.0")
+
+            # Создание временного AIFF файла
+            aiff_path = self.config.get_temp_filename("pyttsx3_raw", ".aiff")
+            self.logger.info(f"📁 Создаем AIFF файл: {aiff_path}")
+
+            # Синтез и сохранение в AIFF
+            engine.save_to_file(text, str(aiff_path))
+            engine.runAndWait()
+
+            # Дополнительное ожидание для macOS
+            import time
+            time.sleep(1)
+
+            # Проверяем, что файл создался
+            if not Path(aiff_path).exists():
+                self.logger.error("❌ pyttsx3 не создал файл")
+                return None
+            
+            size = Path(aiff_path).stat().st_size
+            self.logger.info(f"📊 AIFF файл: {size} байт")
+            
+            # Более строгая проверка размера для macOS pyttsx3
+            if size < 10000:  # Минимум 10KB для реального аудио
+                self.logger.error(f"❌ pyttsx3 создал пустой/слишком маленький файл: {size} байт")
+                
+                # Попробуем альтернативный метод для macOS
+                self.logger.info("🔄 Пробуем альтернативный метод pyttsx3...")
+                alternative_result = self._try_pyttsx3_alternative(text, language, engine)
+                if alternative_result:
+                    return alternative_result
+                
+                return None
+                
+            self.logger.info(f"✅ AIFF файл создан корректно: {size} байт")
+
+            # Конвертация через pydub (работает лучше чем FFmpeg для AIFF)
+            self.logger.info("🔄 Начинаем конвертацию AIFF -> WAV...")
+            wav_path = self._convert_aiff_to_wav_python(aiff_path)
+            
+            if wav_path:
+                self.logger.info(f"✅ pyttsx3 конвертация успешна: {wav_path}")
+                # НЕ удаляем AIFF файл для отладки
+                # try:
+                #     Path(aiff_path).unlink()
+                # except:
+                #     pass
+                return wav_path
+            else:
+                self.logger.warning("Конвертация AIFF -> WAV неудачна")
+                return None
+
+        except ImportError:
+            self.logger.error("pyttsx3 не установлен")
+            return None
+        except Exception as e:
+            self.logger.error(f"pyttsx3 ошибка: {e}")
+            return None
+    
+    def _synthesize_with_say_milena(self, text: str, language: str) -> Optional[str]:
+        """Основной метод синтеза через macOS 'say' команду с голосом Milena"""
+        try:
+            self.logger.info("🍎 Синтез через macOS 'say' с голосом Milena...")
+            
+            import subprocess
+            
+            # Создаем временный AIFF файл через say
+            aiff_path = self.config.get_temp_filename("milena_say", ".aiff")
+            
+            # Команда say с голосом Milena (высочайшее качество)
+            cmd = [
+                'say',
+                '-v', 'Milena',  # Используем простое имя голоса Milena
+                '-o', str(aiff_path),
+                text
+            ]
+            
+            self.logger.info(f"🎙️ Создаем голос Milena для: '{text[:30]}...'")
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            
+            if result.returncode == 0:
+                if Path(aiff_path).exists():
+                    size = Path(aiff_path).stat().st_size
+                    self.logger.info(f"📁 AIFF файл Milena: {size} байт")
+                    
+                    if size > 10000:  # Реальный размер аудио файла
+                        # Конвертируем в WAV
+                        wav_path = self._convert_aiff_to_wav_python(aiff_path)
+                        if wav_path:
+                            self.logger.info("🎉 Голос Milena создан успешно!")
+                            return wav_path
+                        else:
+                            self.logger.error("❌ Ошибка конвертации Milena AIFF -> WAV")
+                    else:
+                        self.logger.error(f"❌ 'say' создал пустой файл: {size} байт")
+                else:
+                    self.logger.error("❌ 'say' не создал файл")
+            else:
+                self.logger.error(f"❌ 'say' ошибка: {result.stderr}")
+                
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка синтеза через 'say': {e}")
+            return None
+
+    def _convert_aiff_to_wav_python(self, aiff_path: str) -> Optional[str]:
+        """Конвертация AIFF в WAV через pydub с увеличением громкости"""
+        try:
+            from pydub import AudioSegment
+            
+            wav_path = self.config.get_temp_filename("milena_converted", ".wav")
+            
+            self.logger.info(f"🔄 Конвертируем AIFF -> WAV: {aiff_path}")
+            
+            # Проверяем исходный файл
+            if not Path(aiff_path).exists():
+                self.logger.error(f"❌ AIFF файл не существует: {aiff_path}")
+                return None
+                
+            aiff_size = Path(aiff_path).stat().st_size
+            self.logger.info(f"📁 AIFF файл: {aiff_size} байт")
+            
+            # Загружаем AIFF файл (pydub умеет читать AIFF)
+            self.logger.info("📖 Загружаем AIFF файл...")
+            audio = AudioSegment.from_file(aiff_path, format="aiff")
+            
+            duration = len(audio) / 1000.0
+            volume = audio.dBFS
+            self.logger.info(f"🎵 AIFF: длительность={duration:.2f}с, громкость={volume:.1f}dBFS")
+            
+            # Увеличиваем громкость если слишком тихо
+            if audio.dBFS < -30:
+                gain_db = -20 - audio.dBFS  # Поднимаем до -20dB
+                audio = audio + gain_db
+                self.logger.info(f"🔊 Увеличена громкость на {gain_db:.1f}dB")
+            
+            # Сохраняем как WAV с оптимальными параметрами
+            self.logger.info(f"💾 Сохраняем WAV: {wav_path}")
+            audio.export(str(wav_path), format="wav", parameters=["-acodec", "pcm_s16le", "-ar", "44100", "-ac", "1"])
+            
+            # Проверяем результат
+            if not Path(wav_path).exists():
+                self.logger.error("❌ WAV файл не создался")
+                return None
+                
+            wav_size = Path(wav_path).stat().st_size
+            self.logger.info(f"✅ WAV файл создан: {wav_size} байт")
+            
+            if wav_size > 1000:
+                self.logger.info(f"🎉 pyttsx3 конвертация успешна: {wav_path}")
+                return str(wav_path)
+            else:
+                self.logger.error(f"❌ Конвертированный WAV файл слишком мал: {wav_size} байт")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка Python конвертации: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            return None
+
+    # def _try_pyttsx3(self, text: str, language: str, speed: float, pitch: float) -> Optional[str]:
+    #     """Попытка синтеза через pyttsx3"""
+    #     try:
+    #         import pyttsx3
+    #
+    #         engine = pyttsx3.init()
+    #
+    #         # Настройка параметров
+    #         voices = engine.getProperty('voices')
+    #
+    #         # Поиск подходящего голоса для языка
+    #         target_voice = None
+    #         for voice in voices:
+    #             if language.startswith('ru') and ('ru' in voice.id.lower() or 'russian' in voice.name.lower()):
+    #                 target_voice = voice.id
+    #                 break
+    #             elif language.startswith('en') and ('en' in voice.id.lower() or 'english' in voice.name.lower()):
+    #                 target_voice = voice.id
+    #                 break
+    #
+    #         if target_voice:
+    #             engine.setProperty('voice', target_voice)
+    #
+    #         # Настройка скорости (обычно 150-250 слов в минуту)
+    #         rate = int(200 * speed)
+    #         engine.setProperty('rate', rate)
+    #
+    #         # Настройка громкости
+    #         engine.setProperty('volume', 1.0)
+    #
+    #         # Сохранение в файл
+    #         output_path = self.config.get_temp_filename("pyttsx3_tts", ".wav")
+    #         engine.save_to_file(text, str(output_path))
+    #         engine.runAndWait()
+    #
+    #         if Path(output_path).exists() and Path(output_path).stat().st_size > 0:
+    #             return str(output_path)
+    #
+    #         return None
+    #
+    #     except ImportError:
+    #         return None
+    #     except Exception:
+    #         return None
     
     def _try_espeak(self, text: str, language: str, speed: float, pitch: float) -> Optional[str]:
         """Попытка синтеза через eSpeak"""
@@ -462,46 +813,43 @@ class SpeechSynthesizer:
     
     def test_tts_engines(self) -> Dict[str, bool]:
         """
-        Тестирование доступности TTS движков
+        Тестирование доступности macOS 'say' команды с голосом Milena
         
         Returns:
-            dict: статус доступности каждого движка
+            dict: статус доступности Milena
         """
         engines = {}
-        test_text = "Hello world"
         
-        # Тест Google TTS
-        try:
-            result = self._synthesize_with_google_tts(test_text, 'en')
-            engines['google_tts'] = bool(result)
-            if result and Path(result).exists():
-                Path(result).unlink()  # Очистка тестового файла
-        except Exception:
-            engines['google_tts'] = False
-        
-        # Тест ElevenLabs
-        try:
-            result = self._synthesize_with_elevenlabs(test_text)
-            engines['elevenlabs'] = bool(result)
-            if result and Path(result).exists():
-                Path(result).unlink()  # Очистка тестового файла
-        except Exception:
-            engines['elevenlabs'] = False
-        
-        # Тест pyttsx3
-        try:
-            import pyttsx3
-            engines['pyttsx3'] = True
-        except ImportError:
-            engines['pyttsx3'] = False
-        
-        # Тест eSpeak
+        # Тестируем macOS 'say' команду с голосом Milena
         try:
             import subprocess
-            subprocess.run(['espeak', '--version'], capture_output=True, check=True)
-            engines['espeak'] = True
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            engines['espeak'] = False
+            
+            # Проверяем доступность команды say
+            result = subprocess.run(['which', 'say'], capture_output=True)
+            if result.returncode != 0:
+                engines['milena'] = False
+                self.logger.error("❌ macOS 'say' команда недоступна")
+                return engines
+            
+            # Проверяем доступность голоса Milena
+            result = subprocess.run(['say', '-v', '?'], capture_output=True, text=True)
+            if result.returncode == 0:
+                voices_output = result.stdout
+                # Ищем голос Milena (простое имя)
+                if 'Milena' in voices_output and 'ru_RU' in voices_output:
+                    engines['milena'] = True
+                    self.logger.info("✅ Голос Milena доступен (русский, высокое качество)")
+                else:
+                    engines['milena'] = False
+                    self.logger.error(f"❌ Голос Milena не найден в системе")
+                    self.logger.debug(f"Доступные голоса (поиск Milena): {voices_output[:500]}")
+            else:
+                engines['milena'] = False
+                self.logger.error("❌ Ошибка проверки голосов")
+                
+        except Exception as e:
+            engines['milena'] = False
+            self.logger.error(f"❌ Ошибка тестирования Milena: {e}")
         
         return engines
     

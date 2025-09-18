@@ -11,8 +11,10 @@ from pathlib import Path
 from typing import Dict, Any, Set
 from dotenv import load_dotenv
 
-# Загружаем переменные окружения
-load_dotenv()
+# Загружаем переменные окружения из корня проекта
+project_root = Path(__file__).parent.parent
+dotenv_path = project_root / '.env'
+load_dotenv(dotenv_path)
 
 
 class Config:
@@ -73,7 +75,10 @@ class Config:
     TTS_API_KEY = os.getenv('GOOGLE_TTS_API_KEY')
     TTS_LANGUAGE = 'ru'
     TTS_VOICE = 'ru-RU-Standard-A'
-    
+    # Принудительное использование только pyttsx3
+    FORCE_PYTTSX3_ONLY = True
+    TTS_ENGINE_PRIORITY = ['pyttsx3']  # только pyttsx3
+
     # === ДОПОЛНИТЕЛЬНЫЕ API ===
     DEEPL_API_KEY = os.getenv('DEEPL_API_KEY')
     ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')

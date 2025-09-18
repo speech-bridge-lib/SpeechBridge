@@ -1,0 +1,92 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+uploads/
+outputs/
+logs/*.log
+temp/
+tmp/
+
+# Media files
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.wav
+*.aiff
+*.m4a
+*.mp3
+*.flac
+
+# Test files
+test_*.py
+debug_*.py
+*_test.py
+*_debug.py
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.log
+translation_debug.log
+segments_timing.txt
+
+# Jupyter
+*.ipynb
+.ipynb_checkpoints
+
+# Model files
+*.pth
+*.pt
+*.ckpt
+
+# Documentation
+*.rtf
+*.docx

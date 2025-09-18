@@ -128,9 +128,85 @@ class AudioProcessor:
             if not Path(audio_path).exists():
                 raise FileNotFoundError(f"Аудио файл не найден: {audio_path}")
             
-            # Загрузка аудио
-            audio = AudioSegment.from_file(audio_path)
-            current_duration = len(audio) / 1000.0
+            # Загрузка аудио с проверкой совместимости
+            try:
+                audio = AudioSegment.from_file(audio_path)
+                current_duration = len(audio) / 1000.0
+                current_dBFS = audio.dBFS
+            except Exception as e:
+                self.logger.error(f"Ошибка загрузки через pydub: {e}")
+                return audio_path
+                
+            self.logger.info(f"Подгонка аудио: {audio_path}")
+            self.logger.info(f"  Исходная длительность: {current_duration:.2f}s")
+            self.logger.info(f"  Целевая длительность: {target_duration:.2f}s") 
+            self.logger.info(f"  Исходная громкость: {current_dBFS:.1f}dBFS")
+            
+            # Файлы голоса Milena работают идеально, пропускаем обработку
+            is_milena_converted = "milena_converted" in str(audio_path)
+            
+            if is_milena_converted:
+                self.logger.info("Обнаружен файл голоса Milena - используем как есть без обработки")
+                return audio_path
+            
+            # Проверка на проблемные файлы (только pyttsx3)
+            is_pyttsx3_file = "pyttsx3" in str(audio_path)
+            if current_duration == 0 or current_dBFS == float('-inf') or is_pyttsx3_file:
+                if is_pyttsx3_file:
+                    self.logger.info("Обнаружен pyttsx3 файл - используем прямую обработку FFmpeg...")
+                else:
+                    self.logger.warning("Обнаружен несовместимый файл! Используем прямую обработку FFmpeg...")
+                
+                # ПОЛНОСТЬЮ ОБХОДИМ PYDUB - работаем только с FFmpeg
+                try:
+                    import subprocess
+                    
+                    # Создаем исправленный файл с точной длительностью
+                    adjusted_path = self.config.get_temp_filename("ffmpeg_adjusted", ".wav")
+                    
+                    # Используем FFmpeg для изменения длительности и нормализации
+                    if target_duration > 0:
+                        cmd = [
+                            'ffmpeg', '-f', 'aiff', '-i', audio_path,  # принудительно указываем AIFF формат
+                            '-af', f'loudnorm,apad=pad_dur={target_duration},atrim=duration={target_duration}',  # используем loudnorm для нормализации
+                            '-acodec', 'pcm_s16le',
+                            '-ar', '44100', 
+                            '-ac', '1',
+                            '-y', str(adjusted_path)
+                        ]
+                    else:
+                        # Если целевая длительность 0, просто нормализуем
+                        cmd = [
+                            'ffmpeg', '-f', 'aiff', '-i', audio_path,  # принудительно указываем AIFF формат
+                            '-af', 'loudnorm',  # используем loudnorm для нормализации
+                            '-acodec', 'pcm_s16le', 
+                            '-ar', '44100',
+                            '-ac', '1',
+                            '-y', str(adjusted_path)
+                        ]
+                    
+                    self.logger.info(f"Аудио процессор FFmpeg команда: {' '.join(cmd)}")
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    
+                    if result.returncode == 0:
+                        self.logger.info(f"Файл обработан через FFmpeg: {adjusted_path}")
+                        # Проверяем результат
+                        try:
+                            test_audio = AudioSegment.from_file(adjusted_path)
+                            final_duration = len(test_audio) / 1000.0
+                            final_dBFS = test_audio.dBFS
+                            self.logger.info(f"  FFmpeg результат: длительность={final_duration:.2f}s, громкость={final_dBFS:.1f}dBFS")
+                        except:
+                            self.logger.info(f"  FFmpeg результат создан (проверка через pydub не удалась)")
+                        
+                        return str(adjusted_path)
+                    else:
+                        self.logger.error(f"FFmpeg обработка неудачна: {result.stderr}")
+                        return audio_path
+                        
+                except Exception as ffmpeg_error:
+                    self.logger.error(f"Ошибка FFmpeg обработки: {ffmpeg_error}")
+                    return audio_path
             
             # Если длительности почти равны, ничего не делаем
             if abs(current_duration - target_duration) < 0.1:
@@ -172,12 +248,26 @@ class AudioProcessor:
                 silence = AudioSegment.silent(duration=silence_duration)
                 adjusted_audio = audio + silence
             
+            # Диагностика после обработки
+            adjusted_dBFS = adjusted_audio.dBFS
+            self.logger.info(f"  После обработки: длительность={len(adjusted_audio) / 1000.0:.2f}s, громкость={adjusted_dBFS:.1f}dBFS")
+            
+            # Нормализация громкости перед сохранением
+            if adjusted_dBFS < -50:  # Если аудио очень тихое
+                target_dBFS = -20.0  # Нормальная громкость
+                volume_change = target_dBFS - adjusted_dBFS
+                adjusted_audio = adjusted_audio + volume_change
+                self.logger.info(f"Нормализация громкости: {adjusted_dBFS:.1f}dBFS -> {target_dBFS:.1f}dBFS")
+            
             # Сохранение подогнанного аудио
             adjusted_path = self.config.get_temp_filename("adjusted", ".wav")
             adjusted_audio.export(str(adjusted_path), format="wav")
             
+            # Финальная диагностика
             final_duration = len(adjusted_audio) / 1000.0
-            self.logger.debug(f"Финальная длительность: {final_duration:.2f}s")
+            final_dBFS = adjusted_audio.dBFS
+            self.logger.info(f"  Финальный результат: {adjusted_path}")
+            self.logger.info(f"  Финальные параметры: длительность={final_duration:.2f}s, громкость={final_dBFS:.1f}dBFS")
             
             return str(adjusted_path)
             

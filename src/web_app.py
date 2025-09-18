@@ -34,6 +34,9 @@ class TranslationTask:
         self.start_time = time.time()
         self.end_time: Optional[float] = None
         self.file_info: Dict = {}
+        # Новые параметры пользователя
+        self.speech_engine: str = 'auto'
+        self.output_format: str = 'TRANSLATION_ONLY'
 
     def to_dict(self) -> Dict:
         """Преобразование в словарь для JSON ответа"""
@@ -44,7 +47,11 @@ class TranslationTask:
             'current_stage': self.current_stage,
             'elapsed_time': int(time.time() - self.start_time),
             'original_filename': self.original_filename,
-            'file_info': self.file_info
+            'file_info': self.file_info,
+            'settings': {
+                'speech_engine': self.speech_engine,
+                'output_format': self.output_format
+            }
         }
 
         if self.status == 'completed':
@@ -98,7 +105,7 @@ class VideoTranslatorApp:
 
         @self.app.route('/api/upload', methods=['POST'])
         def upload_video():
-            """Загрузка и обработка видео"""
+            """Загрузка и обработка видео с настройками"""
             try:
                 # Проверка наличия файла
                 if 'video' not in request.files:
@@ -107,6 +114,12 @@ class VideoTranslatorApp:
                 file = request.files['video']
                 if file.filename == '':
                     return jsonify({'error': 'Файл не выбран'}), 400
+
+                # Получение настроек пользователя
+                speech_engine = request.form.get('speech_engine', 'auto')
+                output_format = request.form.get('output_format', 'TRANSLATION_ONLY')
+                
+                self.app.logger.info(f"📋 Настройки пользователя: engine={speech_engine}, format={output_format}")
 
                 # Валидация имени файла
                 if not self.config.is_allowed_file(file.filename):
@@ -137,9 +150,20 @@ class VideoTranslatorApp:
                         'details': validation['errors']
                     }), 400
 
+                # ИСПРАВЛЕНО: НЕ меняем speech_engine='auto' на конкретный движок!
+                # Пусть VideoTranslator сам разберется с автоматическим выбором всех движков
+                file_size_mb = file.content_length / 1024 / 1024 if file.content_length else 0
+                
+                if speech_engine == 'auto':
+                    self.app.logger.info(f"🤖 Автоматический режим: VideoTranslator попробует все движки для файла {file_size_mb:.1f}MB")
+                else:
+                    self.app.logger.info(f"🎯 Ручной выбор движка: {speech_engine} для файла {file_size_mb:.1f}MB")
+
                 # Создание задачи
                 task = TranslationTask(task_id, str(input_path), original_filename)
                 task.file_info = validation['info']
+                task.speech_engine = speech_engine
+                task.output_format = output_format
                 self.active_tasks[task_id] = task
 
                 # Запуск обработки в отдельном потоке
@@ -151,7 +175,11 @@ class VideoTranslatorApp:
                     'task_id': task_id,
                     'status': 'uploaded',
                     'message': 'Файл загружен, начинается обработка',
-                    'file_info': validation['info']
+                    'file_info': validation['info'],
+                    'settings': {
+                        'speech_engine': speech_engine,
+                        'output_format': output_format
+                    }
                 })
 
             except Exception as e:
@@ -250,6 +278,95 @@ class VideoTranslatorApp:
                 'translator': self.video_translator.get_translator_status()['type']
             })
 
+        # API для управления настройками распознавания
+        @self.app.route('/api/recognition/models')
+        def get_recognition_models():
+            """Получение доступных моделей распознавания"""
+            try:
+                speech_recognizer = self.video_translator.speech_recognizer
+                
+                return jsonify({
+                    'available_models': speech_recognizer.get_available_models(),
+                    'current_settings': speech_recognizer.get_current_settings(),
+                    'engine_status': speech_recognizer.get_engine_status()
+                })
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/recognition/whisper/model', methods=['POST'])
+        def set_whisper_model():
+            """Установка модели Whisper"""
+            try:
+                data = request.get_json()
+                if not data or 'model' not in data:
+                    return jsonify({'error': 'Модель не указана'}), 400
+
+                model = data['model']
+                speech_recognizer = self.video_translator.speech_recognizer
+                
+                success = speech_recognizer.set_whisper_model(model)
+                
+                if success:
+                    return jsonify({
+                        'status': 'success',
+                        'message': f'Модель Whisper установлена: {model}',
+                        'current_settings': speech_recognizer.get_current_settings()
+                    })
+                else:
+                    return jsonify({'error': f'Не удалось установить модель: {model}'}), 400
+                    
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/recognition/engine', methods=['POST'])
+        def set_recognition_engine():
+            """Установка предпочтительного движка распознавания"""
+            try:
+                data = request.get_json()
+                if not data or 'engine' not in data:
+                    return jsonify({'error': 'Движок не указан'}), 400
+
+                engine = data['engine']
+                speech_recognizer = self.video_translator.speech_recognizer
+                
+                success = speech_recognizer.set_preferred_engine(engine)
+                
+                if success:
+                    return jsonify({
+                        'status': 'success',
+                        'message': f'Движок установлен: {engine}',
+                        'current_settings': speech_recognizer.get_current_settings()
+                    })
+                else:
+                    return jsonify({'error': f'Не удалось установить движок: {engine}'}), 400
+                    
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/recognition/test', methods=['POST'])
+        def test_recognition():
+            """Тест распознавания с выбранным движком и моделью"""
+            try:
+                # Этот endpoint можно использовать для тестирования с коротким аудио
+                data = request.get_json()
+                engine = data.get('engine')
+                model = data.get('model')
+                
+                speech_recognizer = self.video_translator.speech_recognizer
+                
+                # Возвращаем информацию о том, что будет использоваться
+                return jsonify({
+                    'test_settings': {
+                        'engine': engine or speech_recognizer.preferred_engine,
+                        'model': model or speech_recognizer.current_whisper_model,
+                        'available': speech_recognizer.available_engines
+                    },
+                    'message': 'Настройки готовы для тестирования'
+                })
+                
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
         # Обработчики ошибок
         @self.app.errorhandler(413)
         def file_too_large(e):
@@ -266,46 +383,90 @@ class VideoTranslatorApp:
             return jsonify({'error': 'Внутренняя ошибка сервера'}), 500
 
     def process_video_async(self, task: TranslationTask):
-        """Асинхронная обработка видео"""
+        """Асинхронная обработка видео с таймаутом"""
+        import threading
+        import time
+        
+        # Флаг для отслеживания завершения
+        processing_complete = threading.Event()
+        timeout_occurred = threading.Event()
+        
+        def timeout_monitor():
+            """Мониторинг таймаута в отдельном потоке"""
+            if not processing_complete.wait(timeout=600):  # 10 минут
+                timeout_occurred.set()
+                self.app.logger.error(f"⏰ Таймаут задачи {task.task_id} (10 минут)")
+                task.status = 'error'
+                task.error_message = "Обработка видео превысила лимит времени (10 минут)"
+        
+        # Запускаем мониторинг таймаута
+        timeout_thread = threading.Thread(target=timeout_monitor, daemon=True)
+        timeout_thread.start()
+        
         try:
             task.status = 'processing'
-            self.app.logger.info(f"Начало обработки задачи {task.task_id}")
+            self.app.logger.info(f"🚀 Начало обработки задачи {task.task_id} с таймаутом 10 мин")
 
             # Определение выходного файла
             output_filename = f"translated_{task.task_id}.mp4"
             output_path = self.config.OUTPUT_FOLDER / output_filename
             task.output_file = str(output_path)
 
-            # Функция обновления прогресса
+            # Функция обновления прогресса с детальным логированием
             def update_progress(stage: str, progress: int):
                 task.current_stage = stage
                 task.progress = progress
-                self.app.logger.debug(f"Задача {task.task_id}: {stage} ({progress}%)")
+                self.app.logger.info(f"📊 Задача {task.task_id}: {stage} ({progress}%)")
 
-            # Запуск перевода
+            # Запуск перевода с логированием
+            self.app.logger.info(f"🎬 Запуск перевода: {task.input_file} -> {output_path}")
+            
+            # Проверяем таймаут перед запуском
+            if timeout_occurred.is_set():
+                raise TimeoutError("Обработка видео превысила лимит времени")
+            
             success = self.video_translator.translate_video(
                 video_path=task.input_file,
                 output_path=str(output_path),
-                progress_callback=update_progress
+                progress_callback=update_progress,
+                speech_engine=task.speech_engine,
+                output_format=task.output_format
             )
+            
+            # Проверяем таймаут после завершения
+            if timeout_occurred.is_set():
+                raise TimeoutError("Обработка видео превысила лимит времени")
+            
+            self.app.logger.info(f"🏁 Перевод завершён, успех: {success}")
 
             if success:
                 task.status = 'completed'
                 task.progress = 100
                 task.current_stage = 'Готово'
-                self.app.logger.info(f"Задача {task.task_id} завершена успешно")
+                self.app.logger.info(f"✅ Задача {task.task_id} завершена успешно")
             else:
                 task.status = 'error'
                 task.error_message = 'Ошибка при обработке видео'
-                self.app.logger.error(f"Задача {task.task_id} завершена с ошибкой")
+                self.app.logger.error(f"❌ Задача {task.task_id} завершена с ошибкой")
 
             task.end_time = time.time()
 
+        except TimeoutError as e:
+            task.status = 'error'
+            task.error_message = f"Таймаут: {str(e)}"
+            task.end_time = time.time()
+            self.app.logger.error(f"⏰ Задача {task.task_id} прервана по таймауту: {e}")
+            
         except Exception as e:
             task.status = 'error'
             task.error_message = str(e)
             task.end_time = time.time()
-            self.app.logger.error(f"Критическая ошибка в задаче {task.task_id}: {e}")
+            self.app.logger.error(f"💥 Критическая ошибка в задаче {task.task_id}: {e}")
+            
+        finally:
+            # Сигнализируем о завершении обработки
+            processing_complete.set()
+            self.app.logger.info(f"🏁 Обработка задачи {task.task_id} завершена")
 
     def cleanup_old_tasks(self, max_age_hours: int = 24):
         """Очистка старых задач"""
