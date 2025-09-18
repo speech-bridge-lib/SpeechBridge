@@ -483,8 +483,16 @@ except Exception as e:
                 start_time = time.time()
                 
                 try:
+                    import sys
+                    import os
+                    
+                    # Используем обычный Python вместо miniforge3 для избежания конфликтов
+                    python_path = "/usr/local/bin/python3" if os.path.exists("/usr/local/bin/python3") else sys.executable
+                    
+                    self.logger.info(f"🐍 Используем Python: {python_path}")
+                    
                     result = subprocess.run([
-                        'python', script_path
+                        python_path, script_path
                     ], capture_output=True, text=True, timeout=300)  # 5 минут таймаут
                     
                     elapsed = time.time() - start_time

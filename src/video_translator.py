@@ -593,9 +593,10 @@ class VideoTranslator:
             level=getattr(logging, self.config.LOG_LEVEL),
             format=self.config.LOG_FORMAT,
             handlers=[
-                logging.FileHandler(self.config.LOG_FILE),
+                logging.FileHandler(self.config.LOG_FILE, mode='w'),  # 'w' = перезапись файла
                 logging.StreamHandler()
-            ]
+            ],
+            force=True  # Принудительно перенастраиваем логгер
         )
         self.logger = logging.getLogger(__name__)
 
