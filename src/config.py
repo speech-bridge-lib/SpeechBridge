@@ -80,7 +80,7 @@ class Config:
     TTS_ENGINE_PRIORITY = ['pyttsx3']  # только pyttsx3
 
     # === ЭКСПЕРИМЕНТАЛЬНЫЕ ФУНКЦИИ ===
-    USE_SPEAKER_DIARIZATION = False  # Сегментация по спикерам
+    USE_SPEAKER_DIARIZATION = True   # Сегментация по спикерам
     USE_ADAPTIVE_VIDEO_TIMING = True  # Адаптивная синхронизация видео
     
     # === ДОПОЛНИТЕЛЬНЫЕ API ===

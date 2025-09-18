@@ -1310,8 +1310,13 @@ class VideoTranslator:
             
             if not final_audio_path:
                 self.logger.warning("⚠️ Не найден путь к финальному аудио, используем обычное видео")
-                Path(temp_video_path).rename(output_path)
-                return True
+                if Path(temp_video_path).exists():
+                    Path(temp_video_path).rename(output_path)
+                    self.logger.info("✅ Базовое видео переименовано в финальное")
+                    return True
+                else:
+                    self.logger.error("❌ Временное видео не найдено")
+                    return False
             
             # Проверяем необходимость адаптации времени
             video_duration = self.video_adjuster._get_media_duration(video_path)
@@ -1363,10 +1368,14 @@ class VideoTranslator:
     
     def _find_combined_audio_path(self) -> Optional[str]:
         """Ищет путь к объединенному аудио файлу"""
-        # Проверяем временные файлы
-        temp_dir = Path(self.config.TEMP_DIR)
-        
+        # Проверяем временные файлы в src/temp
+        temp_dir = Path(self.config.TEMP_FOLDER)
         for audio_file in temp_dir.glob("final_audio_*.wav"):
+            return str(audio_file)
+        
+        # Проверяем корневую директорию проекта (фоллбэк)
+        project_root = Path(self.config.PROJECT_ROOT)
+        for audio_file in project_root.glob("final_audio_*.wav"):
             return str(audio_file)
         
         return None

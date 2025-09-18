@@ -170,10 +170,16 @@ class AudioProcessor:
             self.logger.info(f"  Исходная громкость: {current_dBFS:.1f}dBFS")
             
             # Файлы голоса Milena работают идеально, пропускаем обработку
-            is_milena_converted = "milena_converted" in str(audio_path)
+            audio_path_str = str(audio_path).lower()
+            is_milena_converted = ("milena_converted" in audio_path_str or 
+                                 "milena" in audio_path_str or
+                                 current_duration > 60.0)  # Длинные аудио обычно из TTS
+            
+            # ОТЛАДКА: проверяем детекцию файлов Milena
+            self.logger.info(f"🔍 Проверка файла TTS: path='{audio_path}', is_milena={is_milena_converted}, duration={current_duration:.1f}s")
             
             if is_milena_converted:
-                self.logger.info("Обнаружен файл голоса Milena - используем как есть без обработки")
+                self.logger.info("✅ Обнаружен файл голоса TTS - используем как есть без обработки")
                 return audio_path
             
             # Проверка на проблемные файлы (только pyttsx3)
@@ -289,9 +295,17 @@ class AudioProcessor:
                 adjusted_audio = audio.speedup(playback_speed=speed_factor)
                 
             elif current_duration > target_duration:
-                # Обрезка аудио
-                target_ms = int(target_duration * 1000)
-                adjusted_audio = audio[:target_ms]
+                # ЗАЩИТА: НЕ обрезаем аудио если различие значительное - сохраняем смысл
+                duration_diff = current_duration - target_duration
+                if duration_diff > 5.0:  # Если аудио длиннее на 5+ секунд
+                    self.logger.warning(f"⚠️ КРИТИЧНО: Аудио на {duration_diff:.1f}s длиннее целевой длительности!")
+                    self.logger.warning(f"💡 СОХРАНЯЕМ ВСЕ АУДИО для избежания потери смысла")
+                    # Возвращаем исходное аудио без обрезки
+                    adjusted_audio = audio
+                else:
+                    # Обрезка аудио только при небольших различиях
+                    target_ms = int(target_duration * 1000)
+                    adjusted_audio = audio[:target_ms]
                 
             else:
                 # Добавление тишины в конец

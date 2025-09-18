@@ -184,19 +184,27 @@ class VideoProcessor:
                                 '-c:a', 'aac',  # кодируем аудио в AAC
                             ]
                             
-                            # Стратегия объединения зависит от соотношения длительностей
-                            if abs(video_duration - audio_duration) < 1.0:
-                                # Длительности почти равны - используем shortest (безопасно)
-                                cmd.append('-shortest')
-                                self.logger.debug("🔧 Используем -shortest (длительности близки)")
-                            elif audio_duration > video_duration:
-                                # Аудио длиннее - расширяем видео черным кадром
-                                cmd.extend(['-filter_complex', f'[0:v]pad=enable=\'between(t,{video_duration},{audio_duration})\':color=black'])
-                                self.logger.debug("🔧 Расширяем видео черным кадром для сохранения аудио")
+                            # ИСПРАВЛЕННАЯ ЛОГИКА: Всегда сохраняем полное аудио для избежания потери смысла
+                            # Определяем реальную длительность аудио через PyDub для точности
+                            try:
+                                from pydub import AudioSegment
+                                audio_segment = AudioSegment.from_file(final_audio_path)
+                                real_audio_duration = len(audio_segment) / 1000.0
+                                self.logger.info(f"🔍 РЕАЛЬНАЯ длительность аудио: {real_audio_duration:.2f}s (PyDub)")
+                            except:
+                                real_audio_duration = audio_duration
+                                self.logger.warning("⚠️ Используем FFprobe длительность аудио")
+                            
+                            if real_audio_duration > video_duration + 0.5:  # Аудио заметно длиннее
+                                # Расширяем видео черным кадром для сохранения всего аудио
+                                cmd.extend(['-filter_complex', f'[0:v]tpad=stop_mode=clone:stop_duration={real_audio_duration - video_duration}[v]', '-map', '[v]', '-map', '1:a'])
+                                self.logger.info("🔧 РАСШИРЯЕМ ВИДЕО: добавляем черные кадры для сохранения всего аудио")
+                            elif abs(real_audio_duration - video_duration) < 0.5:
+                                # Длительности действительно близки
+                                self.logger.info("🔧 Длительности близки, используем стандартное объединение")
                             else:
-                                # Видео длиннее - сохраняем все аудио, видео без звука в конце
-                                cmd.append('-shortest')
-                                self.logger.debug("🔧 Сохраняем все аудио, видео завершится тишиной")
+                                # Видео длиннее - сохраняем все аудио
+                                self.logger.info("🔧 Видео длиннее, но сохраняем все аудио")
                             
                             cmd.append(output_path)
 
@@ -394,9 +402,18 @@ class VideoProcessor:
                     exists = Path(segment['translated_audio_path']).exists()
                     self.logger.info(f"  Файл существует: {exists}")
             #         ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-            # Создаем базовую тишину длиной как оригинальное видео
-            final_audio = AudioSegment.silent(duration=int(video_duration * 1000))
-
+            # ИСПРАВЛЕНИЕ: Создаем адаптивное аудио, которое расширяется по необходимости
+            # Сначала определяем максимальную длительность всех сегментов
+            max_end_time = 0
+            for segment in segments:
+                if segment.get('end_time'):
+                    max_end_time = max(max_end_time, segment.get('end_time', 0))
+            
+            # Создаем базовую тишину с запасом для сохранения всего контента
+            base_duration = max(video_duration, max_end_time + 30)  # +30сек запаса
+            final_audio = AudioSegment.silent(duration=int(base_duration * 1000))
+            
+            self.logger.info(f"📏 Базовая длительность аудио: {base_duration:.2f}s (видео: {video_duration:.2f}s, макс сегмент: {max_end_time:.2f}s)")
             self.logger.info(f"Объединение {len(segments)} аудио сегментов...")
 
             successful_segments = 0
@@ -439,10 +456,21 @@ class VideoProcessor:
                     start_time = segment.get('start_time', 0) * 1000  # в миллисекундах
                     end_time = segment.get('end_time', start_time / 1000 + len(segment_audio) / 1000) * 1000
 
-                    # Обрезаем если нужно
-                    max_duration = end_time - start_time
-                    if len(segment_audio) > max_duration:
-                        segment_audio = segment_audio[:int(max_duration)]
+                    # ИСПРАВЛЕНИЕ: НЕ ОБРЕЗАЕМ аудио для сохранения смысла
+                    # Если аудио длиннее исходного сегмента, расширяем базовое аудио
+                    actual_segment_duration = len(segment_audio)
+                    original_duration = end_time - start_time
+                    
+                    if actual_segment_duration > original_duration:
+                        # Расширяем базовое аудио если нужно
+                        required_length = int(start_time + actual_segment_duration)
+                        if required_length > len(final_audio):
+                            extension_needed = required_length - len(final_audio)
+                            final_audio = final_audio + AudioSegment.silent(duration=extension_needed)
+                            self.logger.info(f"🔄 Расширили базовое аудио на {extension_needed/1000:.1f}s для сохранения всего контента")
+                        
+                        # Обновляем end_time для корректной замены
+                        end_time = start_time + actual_segment_duration
 
                     # Нормализуем сегмент перед добавлением, если он очень тихий
                     if segment_audio.dBFS < -50:

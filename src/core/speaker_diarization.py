@@ -55,16 +55,16 @@ class SpeakerDiarization:
         audio = AudioSegment.from_file(audio_path)
         total_duration = len(audio) / 1000.0
         
-        # Адаптивные параметры в зависимости от длины аудио
+        # Адаптивные параметры для диалогов (более чувствительная сегментация)
         if total_duration > 300:  # > 5 минут
-            min_silence_len = 1500  # 1.5 секунды
-            silence_thresh = -35
-        elif total_duration > 120:  # > 2 минуты  
-            min_silence_len = 1000  # 1 секунда
+            min_silence_len = 800   # 0.8 секунды для длинных диалогов
             silence_thresh = -38
+        elif total_duration > 120:  # > 2 минуты  
+            min_silence_len = 600   # 0.6 секунды для средних диалогов
+            silence_thresh = -42
         else:
-            min_silence_len = 800   # 0.8 секунды
-            silence_thresh = -40
+            min_silence_len = 500   # 0.5 секунды для коротких диалогов
+            silence_thresh = -45
             
         self.logger.debug(f"🎛️ Параметры: min_silence={min_silence_len}ms, thresh={silence_thresh}dB")
         
@@ -78,7 +78,7 @@ class SpeakerDiarization:
         # Создаем сегменты между паузами
         segments = []
         current_pos = 0
-        speaker_id = 0
+        current_speaker = 0  # Отслеживаем текущего спикера (0=A, 1=B)
         
         for i, (silence_start, silence_end) in enumerate(silence_segments):
             # Сегмент до паузы
@@ -86,15 +86,22 @@ class SpeakerDiarization:
                 segment_duration = (silence_start - current_pos) / 1000.0
                 
                 if segment_duration >= min_duration:
-                    # Определяем спикера по длительности и позиции
-                    if i == 0:
+                    # Интеллектуальное определение спикера по паузам и длительности
+                    silence_duration = (silence_end - silence_start) / 1000.0 if i < len(silence_segments) - 1 else 0
+                    
+                    if len(segments) == 0:
+                        # Первый сегмент - всегда Speaker_A
                         speaker_label = "Speaker_A"
-                    elif segment_duration > 30:  # Длинные сегменты - вероятно новый спикер
-                        speaker_id += 1
-                        speaker_label = f"Speaker_{chr(65 + speaker_id % 26)}"
+                        current_speaker = 0
+                    elif silence_duration > 2.0:  # Только очень длинная пауза - смена спикера
+                        current_speaker = (current_speaker + 1) % 2  # Чередуем между 0 и 1
+                        speaker_label = f"Speaker_{chr(65 + current_speaker)}"
+                    elif segment_duration > 30:  # Только очень длинный сегмент - возможно новый спикер
+                        current_speaker = (current_speaker + 1) % 2
+                        speaker_label = f"Speaker_{chr(65 + current_speaker)}"
                     else:
-                        # Короткие сегменты - вероятно тот же спикер
-                        speaker_label = f"Speaker_{chr(65 + speaker_id % 26)}"
+                        # Короткий сегмент - тот же спикер
+                        speaker_label = f"Speaker_{chr(65 + current_speaker)}"
                     
                     segment_path = self._extract_audio_segment(
                         audio, current_pos, silence_start, len(segments)
@@ -123,13 +130,17 @@ class SpeakerDiarization:
                     audio, current_pos, len(audio), len(segments)
                 )
                 
+                # Для последнего сегмента тоже определяем спикера интеллектуально
+                if segment_duration > 15:  # Длинный последний сегмент - возможно другой спикер
+                    current_speaker = (current_speaker + 1) % 2
+                
                 segments.append({
                     'id': len(segments),
                     'path': segment_path,
                     'start_time': current_pos / 1000.0,
                     'end_time': len(audio) / 1000.0,
                     'duration': segment_duration,
-                    'speaker': f"Speaker_{chr(65 + speaker_id % 26)}",
+                    'speaker': f"Speaker_{chr(65 + current_speaker)}",
                     'speaker_confidence': 0.8,
                     'silence_after': 0.0
                 })
