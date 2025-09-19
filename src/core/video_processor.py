@@ -89,7 +89,8 @@ class VideoProcessor:
             return None, {}
 
     def create_final_video(self, original_video_path: str, translated_audio_segments: List[dict],
-                           output_path: str, preserve_original_audio: bool = False) -> bool:
+                           output_path: str, preserve_original_audio: bool = False, 
+                           adjust_video_speed: bool = True) -> bool:
         """
         Создает финальное видео с переведенной аудио дорожкой
 
@@ -98,6 +99,7 @@ class VideoProcessor:
             translated_audio_segments: список сегментов с переведенным аудио
             output_path: путь для сохранения
             preserve_original_audio: сохранить оригинальное аудио как фон
+            adjust_video_speed: замедлить видео по сегментам для синхронизации
 
         Returns:
             bool: успех операции
@@ -115,6 +117,11 @@ class VideoProcessor:
             # ТЕПЕРЬ можем проводить диагностику с использованием video
             self.logger.info(f"Получено сегментов: {len(translated_audio_segments)}")
             self.logger.info(f"Длительность видео: {video.duration:.2f}s")
+            
+            # Корректируем скорость видео по сегментам, если включена опция
+            if adjust_video_speed:
+                video = self._adjust_video_speed_by_segments(video, translated_audio_segments)
+                self.logger.info(f"Длительность видео после корректировки: {video.duration:.2f}s")
 
             # Диагностика полученных сегментов
             segments_with_audio = 0
@@ -197,6 +204,9 @@ class VideoProcessor:
                             
                             if real_audio_duration > video_duration + 0.5:  # Аудио заметно длиннее
                                 # Расширяем видео черным кадром для сохранения всего аудио
+                                # ИСПРАВЛЕНИЕ: Нельзя использовать -c:v copy с filter_complex, поэтому перекодируем
+                                cmd[cmd.index('-c:v')] = '-c:v'  # Находим позицию
+                                cmd[cmd.index('copy')] = 'libx264'  # Заменяем copy на libx264
                                 cmd.extend(['-filter_complex', f'[0:v]tpad=stop_mode=clone:stop_duration={real_audio_duration - video_duration}[v]', '-map', '[v]', '-map', '1:a'])
                                 self.logger.info("🔧 РАСШИРЯЕМ ВИДЕО: добавляем черные кадры для сохранения всего аудио")
                             elif abs(real_audio_duration - video_duration) < 0.5:
@@ -344,6 +354,113 @@ class VideoProcessor:
 
             return False
     
+    def _adjust_video_speed_by_segments(self, video: mp.VideoFileClip, 
+                                       translated_audio_segments: List[dict]) -> mp.VideoFileClip:
+        """
+        Замедляет видео по сегментам для синхронизации с переведенным аудио
+        
+        Args:
+            video: исходное видео
+            translated_audio_segments: сегменты с информацией о временных рамках
+            
+        Returns:
+            VideoFileClip: видео с измененной скоростью
+        """
+        try:
+            self.logger.info("=== ЗАМЕДЛЕНИЕ ВИДЕО ПО СЕГМЕНТАМ ===")
+            
+            # Собираем все сегменты с аудио файлами
+            valid_segments = []
+            for segment in translated_audio_segments:
+                if (segment.get('translated_audio_path') and 
+                    Path(segment['translated_audio_path']).exists() and
+                    segment.get('success', False)):
+                    
+                    # Получаем реальную длительность переведенного аудио
+                    try:
+                        audio_segment = AudioSegment.from_file(segment['translated_audio_path'])
+                        translated_duration = len(audio_segment) / 1000.0
+                        
+                        original_duration = segment.get('end_time', 0) - segment.get('start_time', 0)
+                        speed_ratio = original_duration / translated_duration if translated_duration > 0 else 1.0
+                        
+                        valid_segments.append({
+                            'start_time': segment.get('start_time', 0),
+                            'end_time': segment.get('end_time', 0),
+                            'original_duration': original_duration,
+                            'translated_duration': translated_duration,
+                            'speed_ratio': speed_ratio
+                        })
+                        
+                        self.logger.info(f"Сегмент {segment.get('start_time', 0):.1f}-{segment.get('end_time', 0):.1f}s: "
+                                       f"оригинал={original_duration:.1f}s, перевод={translated_duration:.1f}s, "
+                                       f"коэффициент={speed_ratio:.2f}")
+                    except Exception as e:
+                        self.logger.warning(f"Ошибка анализа сегмента {segment.get('translated_audio_path')}: {e}")
+                        continue
+            
+            if not valid_segments:
+                self.logger.warning("Нет валидных сегментов для корректировки скорости")
+                return video
+            
+            # Создаем список клипов с разными скоростями
+            video_clips = []
+            current_time = 0
+            
+            for segment in sorted(valid_segments, key=lambda x: x['start_time']):
+                start_time = segment['start_time']
+                end_time = segment['end_time']
+                speed_ratio = segment['speed_ratio']
+                
+                # Добавляем промежуток до сегмента (нормальная скорость)
+                if current_time < start_time:
+                    normal_clip = video.subclip(current_time, start_time)
+                    video_clips.append(normal_clip)
+                    self.logger.debug(f"Нормальный клип: {current_time:.1f}-{start_time:.1f}s")
+                
+                # Добавляем сегмент с измененной скоростью
+                if speed_ratio != 1.0 and speed_ratio > 0.1:  # Минимальная скорость 0.1x
+                    segment_clip = video.subclip(start_time, end_time)
+                    
+                    # Замедляем или ускоряем видео
+                    if speed_ratio < 1.0:  # Нужно замедлить
+                        adjusted_clip = segment_clip.fx(mp.fx.speedx, speed_ratio)
+                        self.logger.info(f"Замедлен клип {start_time:.1f}-{end_time:.1f}s с коэффициентом {speed_ratio:.2f}")
+                    else:  # Нужно ускорить
+                        adjusted_clip = segment_clip.fx(mp.fx.speedx, speed_ratio)
+                        self.logger.info(f"Ускорен клип {start_time:.1f}-{end_time:.1f}s с коэффициентом {speed_ratio:.2f}")
+                    
+                    video_clips.append(adjusted_clip)
+                else:
+                    # Если коэффициент некорректный, оставляем как есть
+                    normal_clip = video.subclip(start_time, end_time)
+                    video_clips.append(normal_clip)
+                    self.logger.warning(f"Сегмент {start_time:.1f}-{end_time:.1f}s: некорректный коэффициент {speed_ratio:.2f}, оставлен без изменений")
+                
+                current_time = end_time
+            
+            # Добавляем оставшуюся часть видео (нормальная скорость)
+            if current_time < video.duration:
+                final_clip = video.subclip(current_time, video.duration)
+                video_clips.append(final_clip)
+                self.logger.debug(f"Финальный клип: {current_time:.1f}-{video.duration:.1f}s")
+            
+            # Объединяем все клипы
+            if video_clips:
+                adjusted_video = mp.concatenate_videoclips(video_clips)
+                self.logger.info(f"Создано видео с корректировкой скорости: {len(video_clips)} сегментов, "
+                               f"итоговая длительность: {adjusted_video.duration:.2f}s")
+                return adjusted_video
+            else:
+                self.logger.warning("Не удалось создать клипы, возвращаем оригинальное видео")
+                return video
+                
+        except Exception as e:
+            self.logger.error(f"Ошибка корректировки скорости видео: {e}")
+            import traceback
+            self.logger.error(f"Трассировка:\n{traceback.format_exc()}")
+            return video
+
     def _get_media_duration(self, media_path: str) -> float:
         """
         Получение длительности медиа файла

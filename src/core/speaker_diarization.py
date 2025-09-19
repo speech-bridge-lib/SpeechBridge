@@ -18,7 +18,7 @@ class SpeakerDiarization:
         self.config = config
         self.logger = logging.getLogger(__name__)
         
-    def segment_by_speakers(self, audio_path: str, min_speaker_duration: float = 2.0) -> List[Dict]:
+    def segment_by_speakers(self, audio_path: str, min_speaker_duration: float = 5.0) -> List[Dict]:
         """
         Сегментирует аудио по спикерам
         
@@ -55,16 +55,16 @@ class SpeakerDiarization:
         audio = AudioSegment.from_file(audio_path)
         total_duration = len(audio) / 1000.0
         
-        # Адаптивные параметры для диалогов (более чувствительная сегментация)
+        # Адаптивные параметры для диалогов (МЕНЕЕ чувствительная сегментация для этого видео)
         if total_duration > 300:  # > 5 минут
-            min_silence_len = 800   # 0.8 секунды для длинных диалогов
-            silence_thresh = -38
+            min_silence_len = 1200   # 1.2 секунды для длинных диалогов
+            silence_thresh = -35
         elif total_duration > 120:  # > 2 минуты  
-            min_silence_len = 600   # 0.6 секунды для средних диалогов
-            silence_thresh = -42
+            min_silence_len = 1000   # 1.0 секунды для средних диалогов - УВЕЛИЧЕНО
+            silence_thresh = -40     # Менее чувствительный порог
         else:
-            min_silence_len = 500   # 0.5 секунды для коротких диалогов
-            silence_thresh = -45
+            min_silence_len = 800    # 0.8 секунды для коротких диалогов
+            silence_thresh = -42
             
         self.logger.debug(f"🎛️ Параметры: min_silence={min_silence_len}ms, thresh={silence_thresh}dB")
         
@@ -93,10 +93,10 @@ class SpeakerDiarization:
                         # Первый сегмент - всегда Speaker_A
                         speaker_label = "Speaker_A"
                         current_speaker = 0
-                    elif silence_duration > 2.0:  # Только очень длинная пауза - смена спикера
+                    elif silence_duration > 3.0:  # Только ОЧЕНЬ длинная пауза - смена спикера (увеличено с 2.0)
                         current_speaker = (current_speaker + 1) % 2  # Чередуем между 0 и 1
                         speaker_label = f"Speaker_{chr(65 + current_speaker)}"
-                    elif segment_duration > 30:  # Только очень длинный сегмент - возможно новый спикер
+                    elif segment_duration > 60:  # Только ОЧЕНЬ длинный сегмент - возможно новый спикер (увеличено с 30)
                         current_speaker = (current_speaker + 1) % 2
                         speaker_label = f"Speaker_{chr(65 + current_speaker)}"
                     else:
@@ -131,7 +131,7 @@ class SpeakerDiarization:
                 )
                 
                 # Для последнего сегмента тоже определяем спикера интеллектуально
-                if segment_duration > 15:  # Длинный последний сегмент - возможно другой спикер
+                if segment_duration > 30:  # Длинный последний сегмент - возможно другой спикер (увеличено с 15)
                     current_speaker = (current_speaker + 1) % 2
                 
                 segments.append({

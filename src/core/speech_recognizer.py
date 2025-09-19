@@ -493,7 +493,7 @@ except Exception as e:
                     
                     result = subprocess.run([
                         python_path, script_path
-                    ], capture_output=True, text=True, timeout=300)  # 5 минут таймаут
+                    ], capture_output=True, text=True, timeout=600)  # 10 минут таймаут для длинных сегментов
                     
                     elapsed = time.time() - start_time
                     self.logger.info(f"⏱️ Subprocess завершился за {elapsed:.1f}s")
@@ -503,7 +503,7 @@ except Exception as e:
                         self.logger.error(f"📥 Stderr: {result.stderr[:200]}...")
                         
                 except subprocess.TimeoutExpired:
-                    self.logger.error("⏰ Subprocess превысил таймаут 5 минут!")
+                    self.logger.error("⏰ Subprocess превысил таймаут 10 минут!")
                     return None
                     
                 if result.returncode == 0 and "SUCCESS" in result.stdout:
@@ -521,6 +521,21 @@ except Exception as e:
                         })
                     
                     self.logger.info(f"📊 Whisper Subprocess: {len(segments)} исходных сегментов")
+                    
+                    # Добавим диагностику сегментов
+                    total_whisper_duration = 0
+                    if segments:
+                        total_whisper_duration = segments[-1]['end_time'] - segments[0]['start_time']
+                        self.logger.info(f"🕒 Whisper распознал аудио от {segments[0]['start_time']:.1f}s до {segments[-1]['end_time']:.1f}s (длительность: {total_whisper_duration:.1f}s)")
+                        
+                        # Показываем первые и последние сегменты для диагностики
+                        for i, seg in enumerate(segments[:3]):  # Первые 3
+                            self.logger.info(f"  🎯 Сегмент {i+1}: {seg['start_time']:.1f}-{seg['end_time']:.1f}s '{seg['text'][:50]}...'")
+                        if len(segments) > 6:
+                            self.logger.info(f"  ... ({len(segments)-6} средних сегментов) ...")
+                        for i, seg in enumerate(segments[-3:], len(segments)-2):  # Последние 3
+                            if i > 2: # Избегаем дублирования если сегментов мало
+                                self.logger.info(f"  🎯 Сегмент {i}: {seg['start_time']:.1f}-{seg['end_time']:.1f}s '{seg['text'][:50]}...'")
                     
                     # Объединяем в предложения (технология из Colab)
                     sentence_segments = self._merge_segments_into_sentences(segments)

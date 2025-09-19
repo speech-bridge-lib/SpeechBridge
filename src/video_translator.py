@@ -1216,7 +1216,12 @@ class VideoTranslator:
             if use_adaptive_timing:
                 success = self._create_adaptive_final_video(video_path, translated_segments, output_path)
             else:
-                success = self.video_processor.create_final_video(video_path, translated_segments, output_path)
+                # Используем замедление видео по умолчанию для лучшей синхронизации
+                adjust_speed = getattr(self.config, 'ADJUST_VIDEO_SPEED', True)
+                success = self.video_processor.create_final_video(
+                    video_path, translated_segments, output_path, 
+                    adjust_video_speed=adjust_speed
+                )
 
             if progress_callback:
                 progress_callback("Завершено" if success else "Ошибка создания видео", 100 if success else 0)
@@ -1299,7 +1304,11 @@ class VideoTranslator:
             
             # Сначала создаем обычное видео
             temp_video_path = output_path.replace('.mp4', '_temp.mp4')
-            success = self.video_processor.create_final_video(video_path, segments, temp_video_path)
+            adjust_speed = getattr(self.config, 'ADJUST_VIDEO_SPEED', True)
+            success = self.video_processor.create_final_video(
+                video_path, segments, temp_video_path, 
+                adjust_video_speed=adjust_speed
+            )
             
             if not success:
                 self.logger.error("❌ Не удалось создать базовое видео")

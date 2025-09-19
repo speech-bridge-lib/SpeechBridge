@@ -81,7 +81,8 @@ class Config:
 
     # === ЭКСПЕРИМЕНТАЛЬНЫЕ ФУНКЦИИ ===
     USE_SPEAKER_DIARIZATION = True   # Сегментация по спикерам
-    USE_ADAPTIVE_VIDEO_TIMING = True  # Адаптивная синхронизация видео
+    USE_ADAPTIVE_VIDEO_TIMING = False  # Адаптивная синхронизация видео - ОТКЛЮЧЕНО ДЛЯ ТЕСТА
+    ADJUST_VIDEO_SPEED = True  # Замедление видео по сегментам для синхронизации
     
     # === ДОПОЛНИТЕЛЬНЫЕ API ===
     DEEPL_API_KEY = os.getenv('DEEPL_API_KEY')
