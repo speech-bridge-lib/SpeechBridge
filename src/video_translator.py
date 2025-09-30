@@ -30,7 +30,7 @@ from core import VideoProcessor, AudioProcessor, SpeechRecognizer, SpeechSynthes
 from core.speaker_diarization import SpeakerDiarization
 from core.video_time_adjuster import VideoTimeAdjuster
 from core.voice_activity_detector import VoiceActivityDetector
-from translator_compat import translate_text, get_translator_status
+from translator_compat import translate_text, get_translator_status, get_language_info
 from config import config
 
 class VideoTranslator:
@@ -53,7 +53,34 @@ class VideoTranslator:
         self.config.create_directories()
 
         self.logger.info("VideoTranslator инициализирован с модульной архитектурой")
+    
+    def _get_subtitle_language_code(self, language_code):
+        """Получить ISO языковой код для метаданных субтитров"""
+        lang_info = get_language_info(language_code)
+        return lang_info['iso']
+    
+    def _get_subtitle_title(self, language_code):
+        """Получить название языка для метаданных субтитров"""
+        lang_info = get_language_info(language_code)
+        return lang_info['name']
+    
+    def _setup_tts_for_language(self, target_language):
+        """Настроить TTS для целевого языка"""
+        if hasattr(self.speech_synthesizer, 'set_target_language'):
+            self.speech_synthesizer.set_target_language(target_language)
+            self.logger.info(f"🎤 TTS настроен для языка: {target_language}")
         self._log_component_status()
+    
+    def _get_dynamic_language_labels(self, source_language, target_language):
+        """Получить динамические языковые метки для двойных субтитров"""
+        source_info = get_language_info(source_language) if source_language and source_language != 'auto' else {'name': 'EN', 'iso': 'eng'}
+        target_info = get_language_info(target_language)
+        
+        # Используем краткие коды для субтитров (первые 2-3 символа названия языка)
+        source_label = source_info['name'][:3].upper() if source_info['name'] else 'SRC'
+        target_label = target_info['name'][:3].upper() if target_info['name'] else 'TGT'
+        
+        return source_label, target_label
     
     def get_available_engines(self) -> List[str]:
         """Возвращает список доступных движков распознавания"""
@@ -723,7 +750,7 @@ class VideoTranslator:
             self.logger.error(f"Ошибка сохранения результатов распознавания: {e}")
             return ""
 
-    def save_translation_results(self, video_path: str, segments: List[Dict], output_dir: str = None) -> str:
+    def save_translation_results(self, video_path: str, segments: List[Dict], output_dir: str = None, source_language: str = 'auto', target_language: str = 'ru') -> str:
         """
         Сохранение результатов перевода
 
@@ -748,8 +775,8 @@ class VideoTranslator:
             translation_data = {
                 'source_video': str(Path(video_path).name),
                 'processing_date': datetime.now().isoformat(),
-                'source_language': self.config.SOURCE_LANGUAGE,
-                'target_language': self.config.TARGET_LANGUAGE,
+                'source_language': source_language,
+                'target_language': target_language,
                 'translator_type': self.get_translator_status()['type'],
                 'total_segments': len(segments),
                 'segments': []
@@ -785,8 +812,9 @@ class VideoTranslator:
                 translated_text = segment.get('translated_text', '[нет перевода]')
 
                 text_content.append(f"[{self._format_time(start_time)} - {self._format_time(end_time)}]")
-                text_content.append(f"EN: {original_text}")
-                text_content.append(f"RU: {translated_text}")
+                source_label, target_label = self._get_dynamic_language_labels(source_language, target_language)
+                text_content.append(f"{source_label}: {original_text}")
+                text_content.append(f"{target_label}: {translated_text}")
                 text_content.append("")
 
             # Сохранение файлов
@@ -804,7 +832,7 @@ class VideoTranslator:
             self.logger.error(f"Ошибка сохранения результатов перевода: {e}")
             return ""
 
-    def save_complete_transcript(self, video_path: str, segments: List[Dict], output_dir: str = None) -> str:
+    def save_complete_transcript(self, video_path: str, segments: List[Dict], output_dir: str = None, source_language: str = 'auto', target_language: str = 'ru') -> str:
         """
         Сохранение полного транскрипта (оригинал + перевод + временные метки)
 
@@ -856,15 +884,17 @@ class VideoTranslator:
                     f"Время: {self._format_time(start_time)} - {self._format_time(end_time)} ({duration:.1f}s)")
                 text_content.append(f"Статус: {status}")
 
+                source_label, target_label = self._get_dynamic_language_labels(source_language, target_language)
+                
                 if original_text:
-                    text_content.append(f"EN: {original_text}")
+                    text_content.append(f"{source_label}: {original_text}")
                 else:
-                    text_content.append(f"EN: [речь не распознана]")
+                    text_content.append(f"{source_label}: [речь не распознана]")
 
                 if translated_text:
-                    text_content.append(f"RU: {translated_text}")
+                    text_content.append(f"{target_label}: {translated_text}")
                 else:
-                    text_content.append(f"RU: [нет перевода]")
+                    text_content.append(f"{target_label}: [нет перевода]")
 
                 text_content.append("-" * 40)
                 text_content.append("")
@@ -880,7 +910,7 @@ class VideoTranslator:
             self.logger.error(f"Ошибка сохранения полного транскрипта: {e}")
             return ""
 
-    def save_subtitles_srt(self, video_path: str, segments: List[Dict], output_dir: str = None, subtitle_type: str = "both") -> str:
+    def save_subtitles_srt(self, video_path: str, segments: List[Dict], output_dir: str = None, subtitle_type: str = "both", source_language: str = 'auto', target_language: str = 'ru') -> str:
         """
         Сохранение субтитров в формате SRT для видео плеера
         
@@ -905,17 +935,17 @@ class VideoTranslator:
             
             if subtitle_type in ["original", "both"]:
                 srt_file_original = Path(output_dir) / f"{video_name}_subtitles_original_{timestamp}.srt"
-                self._create_srt_file(segments, srt_file_original, "original")
+                self._create_srt_file(segments, srt_file_original, "original", source_language, target_language)
                 srt_files.append(str(srt_file_original))
                 
             if subtitle_type in ["translated", "both"]:
                 srt_file_translated = Path(output_dir) / f"{video_name}_subtitles_translated_{timestamp}.srt"
-                self._create_srt_file(segments, srt_file_translated, "translated")
+                self._create_srt_file(segments, srt_file_translated, "translated", source_language, target_language)
                 srt_files.append(str(srt_file_translated))
             
             if subtitle_type == "both":
                 srt_file_dual = Path(output_dir) / f"{video_name}_subtitles_dual_{timestamp}.srt"
-                self._create_srt_file(segments, srt_file_dual, "dual")
+                self._create_srt_file(segments, srt_file_dual, "dual", source_language, target_language)
                 srt_files.append(str(srt_file_dual))
             
             self.logger.info(f"SRT субтитры сохранены: {', '.join([Path(f).name for f in srt_files])}")
@@ -925,7 +955,7 @@ class VideoTranslator:
             self.logger.error(f"Ошибка создания SRT субтитров: {e}")
             return ""
     
-    def _create_srt_file(self, segments: List[Dict], output_file: Path, subtitle_type: str):
+    def _create_srt_file(self, segments: List[Dict], output_file: Path, subtitle_type: str, source_language: str = 'auto', target_language: str = 'ru'):
         """Создание конкретного SRT файла"""
         def format_time(seconds: float) -> str:
             """Форматирование времени для SRT"""
@@ -935,86 +965,212 @@ class VideoTranslator:
             millisecs = int((seconds % 1) * 1000)
             return f"{hours:02d}:{minutes:02d}:{secs:02d},{millisecs:03d}"
         
-        def format_subtitle_text(text: str, max_chars_per_line: int = 60) -> str:
-            """Форматирование текста субтитров для удобочитаемости"""
-            if not text or len(text) <= max_chars_per_line:
+        def format_subtitle_text(text: str, max_chars_per_line: int = 45, max_lines: int = 4) -> str:
+            """
+            Форматирование текста субтитров для удобочитаемости
+            
+            Args:
+                text: исходный текст
+                max_chars_per_line: максимум символов в строке (уменьшено с 60 до 35)
+                max_lines: максимум строк в субтитре (новый параметр)
+            """
+            if not text:
                 return text
             
-            # Разбиваем на предложения
-            sentences = text.replace('. ', '.\n').replace('! ', '!\n').replace('? ', '?\n').split('\n')
+            # Если текст короткий, возвращаем как есть
+            if len(text) <= max_chars_per_line:
+                return text
+            
+            # Разбиваем текст на слова
+            words = text.strip().split()
+            if not words:
+                return text
             
             formatted_lines = []
             current_line = ""
             
-            for sentence in sentences:
-                sentence = sentence.strip()
-                if not sentence:
-                    continue
-                    
-                # Если предложение помещается в текущую строку
-                if len(current_line) + len(sentence) + 1 <= max_chars_per_line:
-                    if current_line:
-                        current_line += " " + sentence
-                    else:
-                        current_line = sentence
+            for word in words:
+                # Проверяем, поместится ли слово в текущую строку
+                test_line = current_line + (" " + word if current_line else word)
+                
+                if len(test_line) <= max_chars_per_line:
+                    current_line = test_line
                 else:
-                    # Сохраняем текущую строку и начинаем новую
+                    # Если текущая строка не пустая, сохраняем её
                     if current_line:
                         formatted_lines.append(current_line)
+                        
+                        # Ограничиваем количество строк
+                        if len(formatted_lines) >= max_lines:
+                            break
                     
-                    # Если предложение слишком длинное, разбиваем его по словам
-                    if len(sentence) > max_chars_per_line:
-                        words = sentence.split(' ')
-                        current_line = ""
-                        for word in words:
-                            if len(current_line) + len(word) + 1 <= max_chars_per_line:
-                                if current_line:
-                                    current_line += " " + word
-                                else:
-                                    current_line = word
-                            else:
-                                if current_line:
-                                    formatted_lines.append(current_line)
-                                current_line = word
+                    # Начинаем новую строку
+                    # Если слово слишком длинное, обрезаем его
+                    if len(word) > max_chars_per_line:
+                        current_line = word[:max_chars_per_line-3] + "..."
                     else:
-                        current_line = sentence
+                        current_line = word
             
-            # Добавляем последнюю строку
-            if current_line:
+            # Добавляем последнюю строку, если есть место
+            if current_line and len(formatted_lines) < max_lines:
                 formatted_lines.append(current_line)
+            
+            # Если текст не поместился полностью, добавляем многоточие
+            if len(formatted_lines) == max_lines and len(words) > sum(len(line.split()) for line in formatted_lines):
+                if formatted_lines:
+                    last_line = formatted_lines[-1]
+                    if len(last_line) <= max_chars_per_line - 3:
+                        formatted_lines[-1] = last_line + "..."
+                    else:
+                        formatted_lines[-1] = last_line[:max_chars_per_line-3] + "..."
             
             return '\n'.join(formatted_lines)
         
         srt_content = []
         subtitle_index = 1
         
-        for segment in segments:
-            start_time = segment.get('start_time', 0)
-            end_time = segment.get('end_time', start_time + 1)
+        def split_long_segment_for_subtitles(segment, max_duration=12.0, max_chars_total=180):
+            """
+            Умно разбивает длинные сегменты для субтитров
             
+            Args:
+                segment: исходный сегмент
+                max_duration: максимальная длительность одного субтитра (увеличено с 8 до 12 сек)
+                max_chars_total: максимальное количество символов в одном субтитре (45*4=180)
+            """
+            duration = segment.get('end_time', 0) - segment.get('start_time', 0)
             original_text = segment.get('original_text', segment.get('text', ''))
             translated_text = segment.get('translated_text', '')
             
-            # Определяем текст субтитров
-            if subtitle_type == "original":
-                subtitle_text = format_subtitle_text(original_text or '[речь не распознана]')
-            elif subtitle_type == "translated":
-                subtitle_text = format_subtitle_text(translated_text or '[нет перевода]')
-            elif subtitle_type == "dual":
-                lines = []
-                if original_text:
-                    lines.append(f"EN: {format_subtitle_text(original_text, 50)}")
-                if translated_text:
-                    lines.append(f"RU: {format_subtitle_text(translated_text, 50)}")
-                subtitle_text = '\n'.join(lines) if lines else '[нет текста]'
+            # Определяем основной текст для анализа (приоритет переводу)
+            main_text = translated_text or original_text
             
-            # Добавляем в SRT
-            srt_content.append(str(subtitle_index))
-            srt_content.append(f"{format_time(start_time)} --> {format_time(end_time)}")
-            srt_content.append(subtitle_text)
-            srt_content.append("")  # Пустая строка между субтитрами
+            # Если сегмент достаточно короткий по времени И по тексту, оставляем как есть
+            if duration <= max_duration and len(main_text) <= max_chars_total:
+                return [segment]
             
-            subtitle_index += 1
+            # Разбиваем текст на логические части
+            def smart_text_split(text, max_chars):
+                if not text or len(text) <= max_chars:
+                    return [text]
+                
+                import re
+                
+                # Сначала пробуем разбить по предложениям
+                sentences = re.split(r'([.!?]+\s+)', text)
+                if len(sentences) < 3:  # Если предложений мало, разбиваем по другим знакам
+                    sentences = re.split(r'([,;:]\s+|\s+и\s+|\s+а\s+|\s+но\s+|\s+что\s+)', text)
+                
+                # Группируем предложения в части
+                parts = []
+                current_part = ""
+                
+                for sentence in sentences:
+                    sentence = sentence.strip()
+                    if not sentence:
+                        continue
+                    
+                    test_part = current_part + (" " + sentence if current_part else sentence)
+                    
+                    if len(test_part) <= max_chars:
+                        current_part = test_part
+                    else:
+                        if current_part:
+                            parts.append(current_part.strip())
+                        
+                        # Если одно предложение слишком длинное, разбиваем по словам
+                        if len(sentence) > max_chars:
+                            words = sentence.split()
+                            temp_part = ""
+                            for word in words:
+                                test_word = temp_part + (" " + word if temp_part else word)
+                                if len(test_word) <= max_chars:
+                                    temp_part = test_word
+                                else:
+                                    if temp_part:
+                                        parts.append(temp_part.strip())
+                                    temp_part = word
+                            if temp_part:
+                                current_part = temp_part
+                        else:
+                            current_part = sentence
+                
+                if current_part:
+                    parts.append(current_part.strip())
+                
+                return [part for part in parts if part.strip()]
+            
+            # Разбиваем оба текста
+            original_parts = smart_text_split(original_text, max_chars_total)
+            translated_parts = smart_text_split(translated_text, max_chars_total)
+            
+            # Берем максимальное количество частей
+            max_parts = max(len(original_parts), len(translated_parts), 1)
+            
+            # Создаем субсегменты
+            sub_segments = []
+            part_duration = duration / max_parts
+            
+            for i in range(max_parts):
+                start = segment['start_time'] + i * part_duration
+                end = segment['start_time'] + (i + 1) * part_duration
+                
+                # Берем соответствующие части текста
+                orig_part = original_parts[i] if i < len(original_parts) else ""
+                trans_part = translated_parts[i] if i < len(translated_parts) else ""
+                
+                # Создаем субсегмент только если есть хоть какой-то текст
+                if orig_part or trans_part:
+                    sub_segments.append({
+                        **segment,
+                        'start_time': start,
+                        'end_time': end,
+                        'original_text': orig_part,
+                        'translated_text': trans_part
+                    })
+            
+            return sub_segments if sub_segments else [segment]
+        
+        for segment in segments:
+            # Разбиваем длинные сегменты на более короткие
+            sub_segments = split_long_segment_for_subtitles(segment, max_duration=12.0)
+            
+            for sub_segment in sub_segments:
+                start_time = sub_segment.get('start_time', 0)
+                end_time = sub_segment.get('end_time', start_time + 1)
+                
+                original_text = sub_segment.get('original_text', sub_segment.get('text', ''))
+                translated_text = sub_segment.get('translated_text', '')
+                
+                # Пропускаем пустые субсегменты
+                if not original_text and not translated_text:
+                    continue
+                
+                # Определяем текст субтитров
+                if subtitle_type == "original":
+                    subtitle_text = format_subtitle_text(original_text or '[речь не распознана]')
+                elif subtitle_type == "translated":
+                    subtitle_text = format_subtitle_text(translated_text or '[нет перевода]')
+                elif subtitle_type == "dual":
+                    lines = []
+                    source_label, target_label = self._get_dynamic_language_labels(source_language, target_language)
+                    if original_text:
+                        lines.append(f"{source_label}: {format_subtitle_text(original_text, 40, 2)}")
+                    if translated_text:
+                        lines.append(f"{target_label}: {format_subtitle_text(translated_text, 40, 2)}")
+                    subtitle_text = '\n'.join(lines) if lines else '[нет текста]'
+                
+                # Пропускаем очень короткие субтитры
+                if len(subtitle_text.strip()) < 3:
+                    continue
+                
+                # Добавляем в SRT
+                srt_content.append(str(subtitle_index))
+                srt_content.append(f"{format_time(start_time)} --> {format_time(end_time)}")
+                srt_content.append(subtitle_text)
+                srt_content.append("")  # Пустая строка между субтитрами
+                
+                subtitle_index += 1
         
         # Сохраняем файл
         with open(output_file, 'w', encoding='utf-8') as f:
@@ -1022,7 +1178,8 @@ class VideoTranslator:
 
     def translate_video(self, video_path: str, output_path: str, progress_callback: Callable = None,
                         save_texts: bool = True, speech_engine: str = 'whisper', 
-                        whisper_model: str = 'base', output_format: str = 'TRANSLATION_ONLY') -> bool:
+                        whisper_model: str = 'base', output_format: str = 'TRANSLATION_ONLY',
+                        source_language: str = 'auto', target_language: str = 'ru') -> bool:
         """
         Основная функция перевода видео с сохранением текстов
 
@@ -1034,6 +1191,8 @@ class VideoTranslator:
             speech_engine: движок распознавания (только 'whisper')
             whisper_model: модель Whisper ('tiny', 'base', 'small', 'medium', 'large', 'large-v2', 'large-v3')
             output_format: формат вывода ('TRANSLATION_ONLY', 'SUBTITLES_ONLY', 'TRANSLATION_WITH_SUBTITLES')
+            source_language: исходный язык ('auto' для автоопределения или код языка)
+            target_language: целевой язык (код языка DeepL)
 
         Returns:
             bool: True при успехе, False при ошибке
@@ -1043,6 +1202,10 @@ class VideoTranslator:
         try:
             self.logger.info(f"Начало перевода видео: {video_path} -> {output_path}")
             self.logger.info(f"📋 Настройки: движок={speech_engine}, модель={whisper_model}, формат={output_format}")
+            self.logger.info(f"🌍 Языки: {source_language} → {target_language}")
+            
+            # Настраиваем TTS для целевого языка
+            self._setup_tts_for_language(target_language)
             
             # Устанавливаем модель Whisper в SpeechRecognizer
             if hasattr(self.speech_recognizer, 'set_whisper_model'):
@@ -1137,6 +1300,9 @@ class VideoTranslator:
                     self.logger.debug(f"Обработка сегмента {i + 1}/{total_segments}")
 
                     # Проверяем результат VAD - пропускаем сегменты без речи
+                    self.logger.info(f"🔍 ГРАНИЦА СЕГМЕНТА {i + 1}/{total_segments}: Время {segment.get('start', 'N/A')} - {segment.get('end', 'N/A')} ({segment.get('duration', 'N/A')}s)")
+                    self.logger.info(f"🔍 VAD статус: status={segment.get('status')}, vad_is_speech={segment.get('vad_is_speech')}")
+                    
                     if segment.get('status') == 'no_speech_vad' or not segment.get('vad_is_speech', True):
                         self.logger.info(f"⏭️ Сегмент {i + 1}: пропускаем (нет речи по VAD)")
                         translated_segments.append({
@@ -1153,15 +1319,17 @@ class VideoTranslator:
                     if segment.get('source') == 'whisper_timestamps':
                         # Для Whisper сегментов текст уже распознан
                         original_text = segment.get('original_text', '')
-                        self.logger.debug(f"Сегмент {i + 1} из Whisper ({len(original_text)} символов): {original_text[:100]}...")
+                        self.logger.info(f"🔍 ТЕКСТ ИЗ WHISPER {i + 1}: '{original_text}' (длина: {len(original_text)} символов)")
+                        if len(original_text) == 0:
+                            self.logger.warning(f"⚠️ ПУСТОЙ ТЕКСТ из Whisper сегмента {i + 1}!")
                     else:
                         # Обычное распознавание для сегментов по паузам с выбранным движком
                         is_manual_selection = speech_engine != 'auto'
                         original_text = self._transcribe_with_engine(segment['path'], selected_engine, is_manual_selection)
-                        self.logger.debug(f"Сегмент {i + 1} распознан через {selected_engine} ({len(original_text)} символов): {original_text[:100]}...")
+                        self.logger.info(f"🔍 ТЕКСТ РАСПОЗНАН {i + 1} через {selected_engine}: '{original_text}' (длина: {len(original_text)} символов)")
 
                     if not original_text:
-                        self.logger.warning(f"Сегмент {i + 1}: речь не распознана")
+                        self.logger.warning(f"❌ Сегмент {i + 1}: речь не распознана или текст пустой")
                         translated_segments.append({
                             **segment,
                             'original_text': '',
@@ -1173,25 +1341,47 @@ class VideoTranslator:
                         continue
 
                     # 3b. Перевод текста
+                    # Используем языки из параметров функции, а не из конфига
+                    src_lang = source_language if source_language != 'auto' else self.config.SOURCE_LANGUAGE
+                    tgt_lang = target_language
+                    
+                    self.logger.info(f"🔍 ПЕРЕВОД {i + 1}: '{original_text}' ({src_lang} -> {tgt_lang})")
+                    
                     translated_text = translate_text(
                         original_text,
-                        self.config.SOURCE_LANGUAGE,
-                        self.config.TARGET_LANGUAGE
+                        src_lang,
+                        tgt_lang
                     )
 
                     if not translated_text:
+                        self.logger.warning(f"⚠️ ПЕРЕВОД ПУСТОЙ для сегмента {i + 1}, используем оригинальный текст")
                         translated_text = original_text  # Fallback на оригинальный текст
 
-                    self.logger.debug(
-                        f"Сегмент {i + 1} переведен ({len(translated_text)} символов): {translated_text[:100]}...")
+                    self.logger.info(f"🔍 РЕЗУЛЬТАТ ПЕРЕВОДА {i + 1}: '{translated_text}' (длина: {len(translated_text)} символов)")
+                    
+                    # Проверяем на потерю важных фраз
+                    if "кодовую базу" in original_text and "кодовую базу" not in translated_text:
+                        self.logger.error(f"🚨 ПОТЕРЯ ФРАЗЫ 'кодовую базу' в сегменте {i + 1}! Оригинал: '{original_text}' -> Перевод: '{translated_text}'")
+                    if "code base" in original_text and len(translated_text) < len(original_text) * 0.7:
+                        self.logger.error(f"🚨 ПОДОЗРЕНИЕ НА ПОТЕРЮ ТЕКСТА в сегменте {i + 1}! Оригинал: {len(original_text)} -> Перевод: {len(translated_text)} символов")
 
-                    # 3c. Синтез речи с учетом voice_id сегмента
+                    # 3c. Синтез речи с учетом voice_id сегмента и target_duration для Google TTS
                     voice_id = segment.get('voice_id', None)  # Получаем назначенный голос
+                    segment_duration = segment.get('duration', None)  # Длительность сегмента
+                    
+                    self.logger.info(f"🔍 TTS СИНТЕЗ {i + 1}: отправляем на синтез '{translated_text}' (язык: {target_language}, voice: {voice_id}, target_duration: {segment_duration}s)")
+                    
                     tts_path = self.speech_synthesizer.synthesize_speech(
                         translated_text,
-                        self.config.TTS_LANGUAGE,
-                        voice=voice_id
+                        target_language,
+                        voice=voice_id,
+                        target_duration=segment_duration  # Передаем длительность для Google TTS timing adjustment
                     )
+                    
+                    if tts_path:
+                        self.logger.info(f"✅ TTS УСПЕШНО {i + 1}: создан файл {tts_path}")
+                    else:
+                        self.logger.error(f"❌ TTS ОШИБКА {i + 1}: не удалось создать аудио для '{translated_text}'")
 
                     if tts_path:
                         # 3d. Подгонка длительности
@@ -1203,6 +1393,9 @@ class VideoTranslator:
 
                     processing_time = time.time() - segment_start_time
                     successful_segments += 1
+
+                    self.logger.info(f"✅ СЕГМЕНТ {i + 1} ЗАВЕРШЕН: Оригинал='{original_text}' -> Перевод='{translated_text}' -> Аудио={tts_path is not None}")
+                    self.logger.info(f"🔍 ФИНАЛЬНЫЙ РЕЗУЛЬТАТ {i + 1}: original_text='{original_text}', translated_text='{translated_text}', audio_path={tts_path}")
 
                     translated_segments.append({
                         **segment,
@@ -1287,17 +1480,17 @@ class VideoTranslator:
                         saved_files.append(('recognition', recognition_file))
 
                     # Сохранение результатов перевода
-                    translation_file = self.save_translation_results(video_path, translated_segments)
+                    translation_file = self.save_translation_results(video_path, translated_segments, source_language=source_language, target_language=target_language)
                     if translation_file:
                         saved_files.append(('translation', translation_file))
 
                     # Сохранение полного транскрипта
-                    transcript_file = self.save_complete_transcript(video_path, translated_segments)
+                    transcript_file = self.save_complete_transcript(video_path, translated_segments, source_language=source_language, target_language=target_language)
                     if transcript_file:
                         saved_files.append(('transcript', transcript_file))
                     
                     # Создание SRT субтитров
-                    srt_file = self.save_subtitles_srt(video_path, translated_segments, subtitle_type="both")
+                    srt_file = self.save_subtitles_srt(video_path, translated_segments, subtitle_type="both", source_language=source_language, target_language=target_language)
                     if srt_file:
                         saved_files.append(('subtitles', srt_file))
 
@@ -1338,7 +1531,7 @@ class VideoTranslator:
             
             # После создания видео, встраиваем субтитры если нужно
             if success and output_format in ['SUBTITLES_ONLY', 'TRANSLATION_WITH_SUBTITLES']:
-                success = self._embed_subtitles_in_video(output_path, saved_files)
+                success = self._embed_subtitles_in_video(output_path, saved_files, target_language)
 
             if progress_callback:
                 progress_callback("Завершено" if success else "Ошибка создания видео", 100 if success else 0)
@@ -1729,7 +1922,7 @@ class VideoTranslator:
 
         return report
 
-    def _embed_subtitles_in_video(self, video_path: str, saved_files: List[Tuple[str, str]]) -> bool:
+    def _embed_subtitles_in_video(self, video_path: str, saved_files: List[Tuple[str, str]], target_language: str = 'ru') -> bool:
         """
         Встраивает субтитры в видео с помощью FFmpeg
         
@@ -1796,8 +1989,8 @@ class VideoTranslator:
                 '-c:v', 'copy',            # Копируем видео без перекодирования
                 '-c:a', 'copy',            # Копируем аудио без перекодирования
                 '-c:s', 'mov_text',        # Кодек субтитров для MP4
-                '-metadata:s:s:0', 'language=rus',  # Язык субтитров
-                '-metadata:s:s:0', 'title=Russian', # Название дорожки субтитров
+                '-metadata:s:s:0', f'language={self._get_subtitle_language_code(target_language)}',  # Язык субтитров
+                '-metadata:s:s:0', f'title={self._get_subtitle_title(target_language)}', # Название дорожки субтитров
                 temp_video_path
             ]
             

@@ -14,6 +14,86 @@ TRANSLATOR_TYPE = 'deepl'
 translator_instance = None
 _last_translation = None
 
+# Поддерживаемые языки DeepL API (обновлено 2025)
+DEEPL_SOURCE_LANGUAGES = {
+    'ar': 'Arabic',
+    'bg': 'Bulgarian', 
+    'cs': 'Czech',
+    'da': 'Danish',
+    'de': 'German',
+    'el': 'Greek',
+    'en': 'English',
+    'es': 'Spanish',
+    'et': 'Estonian',
+    'fi': 'Finnish',
+    'fr': 'French',
+    'he': 'Hebrew',  # next-gen models only
+    'hu': 'Hungarian',
+    'id': 'Indonesian',
+    'it': 'Italian',
+    'ja': 'Japanese',
+    'ko': 'Korean',
+    'lt': 'Lithuanian',
+    'lv': 'Latvian',
+    'nb': 'Norwegian (Bokmål)',
+    'nl': 'Dutch',
+    'pl': 'Polish',
+    'pt': 'Portuguese',
+    'ro': 'Romanian',
+    'ru': 'Russian',
+    'sk': 'Slovak',
+    'sl': 'Slovenian',
+    'sv': 'Swedish',
+    'th': 'Thai',  # next-gen models only
+    'tr': 'Turkish',
+    'uk': 'Ukrainian',
+    'vi': 'Vietnamese',  # next-gen models only
+    'zh': 'Chinese'
+}
+
+DEEPL_TARGET_LANGUAGES = {
+    'ar': 'Arabic',
+    'bg': 'Bulgarian',
+    'cs': 'Czech', 
+    'da': 'Danish',
+    'de': 'German',
+    'el': 'Greek',
+    'en': 'English',
+    'en-gb': 'English (British)',
+    'en-us': 'English (American)',
+    'es': 'Spanish',
+    'es-419': 'Spanish (Latin American)',  # next-gen models only
+    'et': 'Estonian',
+    'fi': 'Finnish',
+    'fr': 'French',
+    'he': 'Hebrew',  # next-gen models only
+    'hu': 'Hungarian',
+    'id': 'Indonesian',
+    'it': 'Italian',
+    'ja': 'Japanese',
+    'ko': 'Korean',
+    'lt': 'Lithuanian',
+    'lv': 'Latvian',
+    'nb': 'Norwegian (Bokmål)',
+    'nl': 'Dutch',
+    'pl': 'Polish',
+    'pt': 'Portuguese',
+    'pt-br': 'Portuguese (Brazilian)',
+    'pt-pt': 'Portuguese (European)',
+    'ro': 'Romanian',
+    'ru': 'Russian',
+    'sk': 'Slovak',
+    'sl': 'Slovenian',
+    'sv': 'Swedish',
+    'th': 'Thai',  # next-gen models only
+    'tr': 'Turkish',
+    'uk': 'Ukrainian',
+    'vi': 'Vietnamese',  # next-gen models only
+    'zh': 'Chinese',
+    'zh-hans': 'Chinese (Simplified)',
+    'zh-hant': 'Chinese (Traditional)'
+}
+
 
 def _init_deepl():
     """Инициализирует DeepL переводчик"""
@@ -115,8 +195,35 @@ def split_text_into_sentences(text, max_length=400):
     return result
 
 
+def normalize_language_code(lang_code, is_target=False):
+    """Нормализация языкового кода для DeepL API"""
+    if not lang_code:
+        return None
+    
+    lang_lower = lang_code.lower().strip()
+    
+    # Проверяем поддержку языка
+    if is_target:
+        if lang_lower not in DEEPL_TARGET_LANGUAGES:
+            # Пытаемся найти совпадение без региональных вариантов
+            base_lang = lang_lower.split('-')[0]
+            if base_lang in DEEPL_TARGET_LANGUAGES:
+                lang_lower = base_lang
+            else:
+                return None
+        return lang_lower.upper()
+    else:
+        if lang_lower not in DEEPL_SOURCE_LANGUAGES:
+            base_lang = lang_lower.split('-')[0]
+            if base_lang in DEEPL_SOURCE_LANGUAGES:
+                lang_lower = base_lang
+            else:
+                return None
+        return lang_lower.upper()
+
+
 def translate_text(text, src_lang='en', dest_lang='ru'):
-    """Перевод текста через DeepL API"""
+    """Перевод текста через DeepL API с поддержкой всех языков"""
     global _last_translation
 
     if not text or not text.strip():
@@ -127,19 +234,26 @@ def translate_text(text, src_lang='en', dest_lang='ru'):
         return f"[ОШИБКА ПЕРЕВОДА: {text}]"
 
     try:
-        # DeepL использует коды языков в верхнем регистре
-        target_lang = dest_lang.upper()
-        if target_lang == 'RU':
-            target_lang = 'RU'
-        elif target_lang == 'EN':
-            target_lang = 'EN-US'
+        # Нормализуем языковые коды
+        source_lang = normalize_language_code(src_lang, is_target=False)
+        target_lang = normalize_language_code(dest_lang, is_target=True)
+        
+        if not target_lang:
+            logging.error(f"Неподдерживаемый целевой язык: {dest_lang}")
+            return f"[НЕПОДДЕРЖИВАЕМЫЙ ЯЗЫК {dest_lang}: {text}]"
+        
+        logging.info(f"DeepL перевод: {src_lang} → {dest_lang} (нормализовано: {source_lang} → {target_lang})")
         
         # Разбиваем длинный текст на сегменты для лучшего перевода
         text_segments = split_text_into_sentences(text, max_length=400)
         
         if len(text_segments) == 1:
             # Короткий текст - переводим как есть
-            result = translator_instance.translate_text(text, target_lang=target_lang)
+            kwargs = {'target_lang': target_lang}
+            if source_lang:
+                kwargs['source_lang'] = source_lang
+            
+            result = translator_instance.translate_text(text, **kwargs)
             translated = result.text
         else:
             # Длинный текст - переводим по частям
@@ -148,7 +262,11 @@ def translate_text(text, src_lang='en', dest_lang='ru'):
             
             for i, segment in enumerate(text_segments):
                 try:
-                    result = translator_instance.translate_text(segment, target_lang=target_lang)
+                    kwargs = {'target_lang': target_lang}
+                    if source_lang:
+                        kwargs['source_lang'] = source_lang
+                    
+                    result = translator_instance.translate_text(segment, **kwargs)
                     translated_segments.append(result.text)
                     logging.debug(f"DeepL: сегмент {i+1}/{len(text_segments)} переведен")
                 except Exception as e:
@@ -157,12 +275,81 @@ def translate_text(text, src_lang='en', dest_lang='ru'):
             
             translated = " ".join(translated_segments)
 
-        _last_translation = {'original': text, 'translated': translated, 'method': 'deepl'}
+        _last_translation = {
+            'original': text, 
+            'translated': translated, 
+            'method': 'deepl',
+            'source_lang': src_lang,
+            'target_lang': dest_lang
+        }
         return translated
 
     except Exception as e:
         logging.error(f"DeepL перевод ошибка: {e}")
         return f"[ОШИБКА ПЕРЕВОДА: {text}]"
+
+
+def get_supported_languages():
+    """Получить список поддерживаемых языков"""
+    return {
+        'source_languages': DEEPL_SOURCE_LANGUAGES,
+        'target_languages': DEEPL_TARGET_LANGUAGES
+    }
+
+
+# Маппинг языковых кодов на TTS модели и метаданные
+LANGUAGE_TTS_MAPPING = {
+    'ar': {'tts_lang': 'ar', 'name': 'Arabic', 'iso': 'ara'},
+    'bg': {'tts_lang': 'bg', 'name': 'Bulgarian', 'iso': 'bul'},
+    'cs': {'tts_lang': 'cs', 'name': 'Czech', 'iso': 'ces'},
+    'da': {'tts_lang': 'da', 'name': 'Danish', 'iso': 'dan'},
+    'de': {'tts_lang': 'de', 'name': 'German', 'iso': 'deu'},
+    'el': {'tts_lang': 'el', 'name': 'Greek', 'iso': 'ell'},
+    'en': {'tts_lang': 'en', 'name': 'English', 'iso': 'eng'},
+    'en-gb': {'tts_lang': 'en', 'name': 'English (British)', 'iso': 'eng'},
+    'en-us': {'tts_lang': 'en', 'name': 'English (American)', 'iso': 'eng'},
+    'es': {'tts_lang': 'es', 'name': 'Spanish', 'iso': 'spa'},
+    'es-419': {'tts_lang': 'es', 'name': 'Spanish (Latin American)', 'iso': 'spa'},
+    'et': {'tts_lang': 'et', 'name': 'Estonian', 'iso': 'est'},
+    'fi': {'tts_lang': 'fi', 'name': 'Finnish', 'iso': 'fin'},
+    'fr': {'tts_lang': 'fr', 'name': 'French', 'iso': 'fra'},
+    'he': {'tts_lang': 'he', 'name': 'Hebrew', 'iso': 'heb'},
+    'hu': {'tts_lang': 'hu', 'name': 'Hungarian', 'iso': 'hun'},
+    'id': {'tts_lang': 'id', 'name': 'Indonesian', 'iso': 'ind'},
+    'it': {'tts_lang': 'it', 'name': 'Italian', 'iso': 'ita'},
+    'ja': {'tts_lang': 'ja', 'name': 'Japanese', 'iso': 'jpn'},
+    'ko': {'tts_lang': 'ko', 'name': 'Korean', 'iso': 'kor'},
+    'lt': {'tts_lang': 'lt', 'name': 'Lithuanian', 'iso': 'lit'},
+    'lv': {'tts_lang': 'lv', 'name': 'Latvian', 'iso': 'lav'},
+    'nb': {'tts_lang': 'no', 'name': 'Norwegian (Bokmål)', 'iso': 'nor'},
+    'nl': {'tts_lang': 'nl', 'name': 'Dutch', 'iso': 'nld'},
+    'pl': {'tts_lang': 'pl', 'name': 'Polish', 'iso': 'pol'},
+    'pt': {'tts_lang': 'pt', 'name': 'Portuguese', 'iso': 'por'},
+    'pt-br': {'tts_lang': 'pt', 'name': 'Portuguese (Brazilian)', 'iso': 'por'},
+    'pt-pt': {'tts_lang': 'pt', 'name': 'Portuguese (European)', 'iso': 'por'},
+    'ro': {'tts_lang': 'ro', 'name': 'Romanian', 'iso': 'ron'},
+    'ru': {'tts_lang': 'ru', 'name': 'Russian', 'iso': 'rus'},
+    'sk': {'tts_lang': 'sk', 'name': 'Slovak', 'iso': 'slk'},
+    'sl': {'tts_lang': 'sl', 'name': 'Slovenian', 'iso': 'slv'},
+    'sv': {'tts_lang': 'sv', 'name': 'Swedish', 'iso': 'swe'},
+    'th': {'tts_lang': 'th', 'name': 'Thai', 'iso': 'tha'},
+    'tr': {'tts_lang': 'tr', 'name': 'Turkish', 'iso': 'tur'},
+    'uk': {'tts_lang': 'uk', 'name': 'Ukrainian', 'iso': 'ukr'},
+    'vi': {'tts_lang': 'vi', 'name': 'Vietnamese', 'iso': 'vie'},
+    'zh': {'tts_lang': 'zh', 'name': 'Chinese', 'iso': 'zho'},
+    'zh-hans': {'tts_lang': 'zh', 'name': 'Chinese (Simplified)', 'iso': 'zho'},
+    'zh-hant': {'tts_lang': 'zh-tw', 'name': 'Chinese (Traditional)', 'iso': 'zho'},
+}
+
+
+def get_language_info(lang_code):
+    """Получить информацию о языке для TTS и метаданных"""
+    lang_lower = lang_code.lower().strip()
+    return LANGUAGE_TTS_MAPPING.get(lang_lower, {
+        'tts_lang': lang_lower,
+        'name': lang_code.upper(),
+        'iso': lang_lower[:3]
+    })
 
 
 def get_translator_status():

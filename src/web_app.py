@@ -17,6 +17,8 @@ from werkzeug.utils import secure_filename
 # Локальные модули
 from config import config
 from video_translator import VideoTranslator
+from core.tts_manual_selector import tts_manual_selector
+from core.tts_engine_factory import TTSEngine
 
 
 class TranslationTask:
@@ -99,10 +101,15 @@ class VideoTranslatorApp:
         def index():
             """Главная страница"""
             translator_status = self.video_translator.get_translator_status()
+            # Получаем поддерживаемые языки
+            from translator_compat import get_supported_languages
+            supported_languages = get_supported_languages()
+            
             return render_template('index.html',
                                    max_file_size=self.config.MAX_FILE_SIZE_MB,
                                    allowed_extensions=list(self.config.ALLOWED_EXTENSIONS),
-                                   translator_status=translator_status)
+                                   translator_status=translator_status,
+                                   supported_languages=supported_languages)
 
         @self.app.route('/api/upload', methods=['POST'])
         def upload_video():
@@ -119,11 +126,14 @@ class VideoTranslatorApp:
                 # Получение настроек пользователя
                 whisper_model = request.form.get('speech_engine', 'base')  # Теперь это модель Whisper
                 output_format = request.form.get('output_format', 'TRANSLATION_ONLY')
+                source_language = request.form.get('source_language', 'auto')  # Язык источника
+                target_language = request.form.get('target_language', 'ru')   # Целевой язык
                 
                 # Всегда используем Whisper
                 speech_engine = 'whisper'
                 
                 self.app.logger.info(f"📋 Настройки пользователя: whisper_model={whisper_model}, format={output_format}")
+                self.app.logger.info(f"🌍 Языки: {source_language} → {target_language}")
 
                 # Валидация имени файла
                 if not self.config.is_allowed_file(file.filename):
@@ -169,6 +179,8 @@ class VideoTranslatorApp:
                 task.speech_engine = speech_engine
                 task.whisper_model = whisper_model  # Устанавливаем модель Whisper
                 task.output_format = output_format
+                task.source_language = source_language
+                task.target_language = target_language
                 self.active_tasks[task_id] = task
 
                 # Запуск обработки в отдельном потоке
@@ -183,7 +195,9 @@ class VideoTranslatorApp:
                     'file_info': validation['info'],
                     'settings': {
                         'speech_engine': speech_engine,
-                        'output_format': output_format
+                        'output_format': output_format,
+                        'source_language': source_language,
+                        'target_language': target_language
                     }
                 })
 
@@ -443,6 +457,247 @@ class VideoTranslatorApp:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
+        # ===============================================
+        # API для управления TTS движками
+        # ===============================================
+        
+        @self.app.route('/api/tts/engines')
+        def get_tts_engines():
+            """Получение доступных TTS движков"""
+            try:
+                available_engines = []
+                for engine in tts_manual_selector.tts_factory.get_available_engines():
+                    if engine.value != 'auto':
+                        engine_info = tts_manual_selector.tts_factory.engines_info.get(engine)
+                        available_engines.append({
+                            'engine': engine.value,
+                            'name': engine_info.name if engine_info else engine.value,
+                            'description': engine_info.description if engine_info else "",
+                            'quality_score': engine_info.quality_score if engine_info else 5,
+                            'speed_score': engine_info.speed_score if engine_info else 5,
+                            'cost': engine_info.cost if engine_info else "unknown"
+                        })
+                
+                return jsonify({
+                    'engines': available_engines,
+                    'user_preferences': tts_manual_selector.get_all_preferences()
+                })
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/api/tts/engines/<language>')
+        def get_tts_engines_for_language(language):
+            """Получение доступных TTS движков для конкретного языка"""
+            try:
+                data = tts_manual_selector.get_selection_interface_data(language)
+                return jsonify(data)
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/tts/preference', methods=['POST'])
+        def set_tts_preference():
+            """Установка пользовательских настроек TTS для языка"""
+            try:
+                import logging
+                logger = logging.getLogger(__name__)
+                
+                data = request.get_json()
+                logger.info(f"🔍 Получены данные для сохранения TTS настроек: {data}")
+                
+                if not data:
+                    logger.warning("⚠️ Данные не предоставлены")
+                    return jsonify({'error': 'Данные не предоставлены'}), 400
+                
+                language = data.get('language')
+                engine = data.get('engine')
+                voice = data.get('voice')
+                fallback_engine = data.get('fallback_engine')
+                notes = data.get('notes', '')
+                
+                logger.info(f"🔍 Параметры: lang={language}, engine={engine}, voice={voice}, fallback={fallback_engine}")
+                
+                if not language or not engine:
+                    logger.warning("⚠️ Язык и движок обязательны")
+                    return jsonify({'error': 'Язык и движок обязательны'}), 400
+                
+                try:
+                    engine_enum = TTSEngine(engine)
+                    fallback_enum = TTSEngine(fallback_engine) if fallback_engine else None
+                    logger.info(f"🔍 Конвертированы в enum: engine={engine_enum}, fallback={fallback_enum}")
+                except ValueError as e:
+                    logger.warning(f"⚠️ Неверный движок: {e}")
+                    return jsonify({'error': 'Неверный движок'}), 400
+                
+                logger.info("🔍 Вызываем set_user_preference...")
+                success = tts_manual_selector.set_user_preference(
+                    language=language,
+                    engine=engine_enum,
+                    voice=voice,
+                    fallback_engine=fallback_enum,
+                    notes=notes
+                )
+                
+                logger.info(f"🔍 Результат set_user_preference: {success}")
+                
+                if success:
+                    return jsonify({
+                        'status': 'success',
+                        'message': f'Настройки TTS для {language} сохранены',
+                        'effective_engine': tts_manual_selector.get_effective_engine_for_language(language).value,
+                        'effective_voice': tts_manual_selector.get_effective_voice_for_language(language)
+                    })
+                else:
+                    logger.error("❌ Не удалось сохранить настройки")
+                    return jsonify({'error': 'Не удалось сохранить настройки'}), 400
+                    
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/tts/preference/<language>', methods=['GET'])
+        def get_tts_preference(language):
+            """Получение настроек TTS для языка"""
+            try:
+                preference = tts_manual_selector.get_user_preference(language)
+                
+                if preference:
+                    return jsonify({
+                        'language': preference.language,
+                        'preferred_engine': preference.preferred_engine.value,
+                        'preferred_voice': preference.preferred_voice,
+                        'fallback_engine': preference.fallback_engine.value if preference.fallback_engine else None,
+                        'enabled': preference.enabled,
+                        'notes': preference.notes,
+                        'effective_engine': tts_manual_selector.get_effective_engine_for_language(language).value,
+                        'effective_voice': tts_manual_selector.get_effective_voice_for_language(language)
+                    })
+                else:
+                    return jsonify({
+                        'language': language,
+                        'has_preference': False,
+                        'effective_engine': tts_manual_selector.get_effective_engine_for_language(language).value,
+                        'effective_voice': tts_manual_selector.get_effective_voice_for_language(language)
+                    })
+                    
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/tts/preference/<language>', methods=['DELETE'])
+        def delete_tts_preference(language):
+            """Удаление пользовательских настроек TTS для языка"""
+            try:
+                success = tts_manual_selector.remove_user_preference(language)
+                
+                if success:
+                    return jsonify({
+                        'status': 'success',
+                        'message': f'Настройки TTS для {language} удалены',
+                        'effective_engine': tts_manual_selector.get_effective_engine_for_language(language).value
+                    })
+                else:
+                    return jsonify({'error': 'Не удалось удалить настройки'}), 400
+                    
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/tts/preference/<language>/toggle', methods=['POST'])
+        def toggle_tts_preference(language):
+            """Включение/выключение пользовательских настроек TTS"""
+            try:
+                data = request.get_json()
+                enabled = data.get('enabled', True)
+                
+                success = tts_manual_selector.toggle_preference(language, enabled)
+                
+                if success:
+                    status = "включены" if enabled else "выключены"
+                    return jsonify({
+                        'status': 'success',
+                        'message': f'Настройки TTS для {language} {status}',
+                        'enabled': enabled,
+                        'effective_engine': tts_manual_selector.get_effective_engine_for_language(language).value
+                    })
+                else:
+                    return jsonify({'error': 'Не удалось изменить настройки'}), 400
+                    
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/tts/preferences')
+        def get_all_tts_preferences():
+            """Получение всех пользовательских настроек TTS"""
+            try:
+                preferences = tts_manual_selector.get_all_preferences()
+                summary = tts_manual_selector.generate_selection_summary()
+                
+                return jsonify({
+                    'preferences': preferences,
+                    'languages_with_preferences': tts_manual_selector.get_languages_with_preferences(),
+                    'summary': summary
+                })
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/tts/preferences/reset', methods=['POST'])
+        def reset_all_tts_preferences():
+            """Сброс всех пользовательских настроек TTS"""
+            try:
+                success = tts_manual_selector.reset_all_preferences()
+                
+                if success:
+                    return jsonify({
+                        'status': 'success',
+                        'message': 'Все настройки TTS сброшены'
+                    })
+                else:
+                    return jsonify({'error': 'Не удалось сбросить настройки'}), 400
+                    
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+        
+        @self.app.route('/api/tts/test', methods=['POST'])
+        def test_tts_engine():
+            """Тестирование TTS движка"""
+            try:
+                data = request.get_json()
+                if not data:
+                    return jsonify({'error': 'Данные не предоставлены'}), 400
+                
+                language = data.get('language', 'ru')
+                engine = data.get('engine')
+                text = data.get('text', f'Тест TTS для языка {language}')
+                
+                if engine:
+                    try:
+                        engine_enum = TTSEngine(engine)
+                    except ValueError:
+                        return jsonify({'error': 'Неверный движок'}), 400
+                else:
+                    engine_enum = tts_manual_selector.get_effective_engine_for_language(language)
+                
+                # Синтез тестового аудио
+                result = tts_manual_selector.tts_factory.synthesize_with_engine(
+                    text=text,
+                    language=language,
+                    engine=engine_enum
+                )
+                
+                if result:
+                    return jsonify({
+                        'status': 'success',
+                        'message': f'Тестовый синтез выполнен успешно',
+                        'engine_used': engine_enum.value,
+                        'language': language,
+                        'audio_file': result  # Путь к файлу для разработки
+                    })
+                else:
+                    return jsonify({
+                        'status': 'error',
+                        'message': 'Не удалось выполнить синтез'
+                    }), 400
+                    
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
         # Обработчики ошибок
         @self.app.errorhandler(413)
         def file_too_large(e):
@@ -507,7 +762,9 @@ class VideoTranslatorApp:
                 progress_callback=update_progress,
                 speech_engine=task.speech_engine,
                 whisper_model=task.whisper_model,
-                output_format=task.output_format
+                output_format=task.output_format,
+                source_language=getattr(task, 'source_language', 'auto'),
+                target_language=getattr(task, 'target_language', 'ru')
             )
             
             # Проверяем таймаут после завершения
@@ -574,7 +831,7 @@ class VideoTranslatorApp:
         """Получение экземпляра Flask приложения"""
         return self.app
 
-    def run(self, host: str = '127.0.0.1', port: int = 5000, debug: bool = True):
+    def run(self, host: str = '127.0.0.1', port: int = 5000, debug: bool = False, use_reloader: bool = False):
         """Запуск приложения"""
         self.app.logger.info(f"Запуск Video-Translator на {host}:{port}")
         self.app.run(host=host, port=port, debug=debug, threaded=True)
@@ -595,5 +852,5 @@ if __name__ == "__main__":
     print(f"Конфигурация загружена: {app.config}")
 
     # Тестовый запуск
-    print("Запуск тестового сервера...")
-    app.run(debug=True)
+    print("Запуск сервера...")
+    app.run(debug=False)

@@ -173,6 +173,10 @@ class AudioProcessor:
         Returns:
             str: путь к подогнанному аудио файлу или None при ошибке
         """
+        # ДИАГНОСТИКА: логируем каждый вызов функции
+        self.logger.info(f"🔧 adjust_audio_duration ВЫЗВАНА для: {Path(audio_path).name}")
+        self.logger.info(f"🔧 Целевая длительность: {target_duration:.2f}s")
+        
         try:
             if not Path(audio_path).exists():
                 raise FileNotFoundError(f"Аудио файл не найден: {audio_path}")
@@ -184,6 +188,7 @@ class AudioProcessor:
                 current_dBFS = audio.dBFS
             except Exception as e:
                 self.logger.error(f"Ошибка загрузки через pydub: {e}")
+                self.logger.info(f"🔧 adjust_audio_duration ЗАВЕРШЕНА: возвращаем исходный путь из-за ошибки загрузки")
                 return audio_path
                 
             self.logger.info(f"Подгонка аудио: {audio_path}")
@@ -191,18 +196,21 @@ class AudioProcessor:
             self.logger.info(f"  Целевая длительность: {target_duration:.2f}s") 
             self.logger.info(f"  Исходная громкость: {current_dBFS:.1f}dBFS")
             
-            # Файлы голоса Milena работают идеально, пропускаем обработку
+            # Файлы TTS (и Milena, и Google TTS) работают качественно, минимальная обработка
             audio_path_str = str(audio_path).lower()
-            is_milena_converted = ("milena_converted" in audio_path_str or 
-                                 "milena" in audio_path_str or
-                                 current_duration > 60.0)  # Длинные аудио обычно из TTS
+            is_tts_file = ("milena_converted" in audio_path_str or 
+                          "milena" in audio_path_str or
+                          "google_tts_converted" in audio_path_str or
+                          "google_tts" in audio_path_str or
+                          current_duration > 60.0)  # Длинные аудио обычно из TTS
             
-            # ОТЛАДКА: проверяем детекцию файлов Milena
-            self.logger.info(f"🔍 Проверка файла TTS: path='{audio_path}', is_milena={is_milena_converted}, duration={current_duration:.1f}s")
+            # ОТЛАДКА: проверяем детекцию файлов TTS
+            self.logger.info(f"🔍 Проверка файла TTS: path='{audio_path}', is_tts={is_tts_file}, duration={current_duration:.1f}s")
             
-            if is_milena_converted:
-                self.logger.info("✅ Обнаружен файл голоса TTS - используем как есть без обработки")
-                return audio_path
+            # Для TTS файлов применяем УНИФИЦИРОВАННЫЙ алгоритм (одинаковый для всех TTS)
+            if is_tts_file:
+                self.logger.info("✅ Обнаружен файл TTS - применяем стандартную обработку длительности")
+                # НЕ пропускаем обработку, но используем щадящий режим
             
             # Проверка на проблемные файлы (только pyttsx3)
             is_pyttsx3_file = "pyttsx3" in str(audio_path)
@@ -295,39 +303,76 @@ class AudioProcessor:
             self.logger.debug(f"Подгонка длительности: {current_duration:.2f}s -> {target_duration:.2f}s")
             
             if method == 'auto':
-                # Автоматический выбор метода
+                # Автоматический выбор метода с учётом типа файла
                 ratio = current_duration / target_duration
-                if 0.8 <= ratio <= 1.3:
-                    method = 'speed'  # Изменение скорости в разумных пределах
+                
+                if is_tts_file:
+                    # Для TTS файлов более консервативный подход
+                    if 0.9 <= ratio <= 1.2:
+                        method = 'speed'  # Только минимальные изменения скорости
+                        self.logger.info("🎵 TTS файл: используем изменение скорости (консервативно)")
+                    else:
+                        method = 'pad'    # Предпочитаем дополнение/обрезку для больших различий
+                        self.logger.info("🎵 TTS файл: используем дополнение/обрезку")
                 else:
-                    method = 'pad'    # Обрезка или дополнение тишиной
+                    # Для обычных файлов стандартная логика
+                    if 0.8 <= ratio <= 1.3:
+                        method = 'speed'  # Изменение скорости в разумных пределах
+                    else:
+                        method = 'pad'    # Обрезка или дополнение тишиной
             
             if method == 'speed' and current_duration > target_duration:
                 # Ускорение аудио
                 speed_factor = current_duration / target_duration
-                # Ограничиваем ускорение до разумных пределов
-                speed_factor = min(speed_factor, 1.5)
+                # Ограничиваем ускорение с учётом типа файла
+                if is_tts_file:
+                    speed_factor = min(speed_factor, 1.2)  # Более консервативно для TTS
+                else:
+                    speed_factor = min(speed_factor, 1.5)  # Стандартно для обычных файлов
+                self.logger.info(f"🚀 УСКОРЕНИЕ аудио: фактор {speed_factor:.2f}x ({current_duration:.2f}s -> {target_duration:.2f}s)")
                 adjusted_audio = audio.speedup(playback_speed=speed_factor)
                 
             elif method == 'speed' and current_duration < target_duration:
-                # Замедление аудио
-                speed_factor = current_duration / target_duration
-                # Ограничиваем замедление до разумных пределов
-                speed_factor = max(speed_factor, 0.7)
+                # Замедление аудио (ИСПРАВЛЕНО: правильная формула)
+                speed_factor = target_duration / current_duration
+                # Ограничиваем замедление с учётом типа файла
+                if is_tts_file:
+                    speed_factor = min(speed_factor, 1.2)  # Более консервативно для TTS
+                else:
+                    speed_factor = min(speed_factor, 1.5)  # Стандартно для обычных файлов
+                self.logger.info(f"🐌 ЗАМЕДЛЕНИЕ аудио: фактор {speed_factor:.2f}x ({current_duration:.2f}s -> {target_duration:.2f}s)")
                 adjusted_audio = audio.speedup(playback_speed=speed_factor)
                 
             elif current_duration > target_duration:
                 # ЗАЩИТА: НЕ обрезаем аудио если различие значительное - сохраняем смысл
                 duration_diff = current_duration - target_duration
-                if duration_diff > 5.0:  # Если аудио длиннее на 5+ секунд
-                    self.logger.warning(f"⚠️ КРИТИЧНО: Аудио на {duration_diff:.1f}s длиннее целевой длительности!")
-                    self.logger.warning(f"💡 СОХРАНЯЕМ ВСЕ АУДИО для избежания потери смысла")
-                    # Возвращаем исходное аудио без обрезки
-                    adjusted_audio = audio
+                
+                # Для TTS файлов применяем более строгую защиту от потери текста
+                if is_tts_file:
+                    # Для TTS файлов используем изменение скорости вместо обрезки
+                    if duration_diff > 0.5:  # Если различие больше 0.5s
+                        self.logger.warning(f"⚠️ TTS ФАЙЛ: Аудио на {duration_diff:.1f}s длиннее целевой длительности!")
+                        self.logger.warning(f"💡 ИСПОЛЬЗУЕМ УСКОРЕНИЕ вместо обрезки для сохранения текста")
+                        speed_factor = current_duration / target_duration
+                        speed_factor = min(speed_factor, 1.5)  # Ограничиваем ускорение
+                        self.logger.info(f"🚀 TTS УСКОРЕНИЕ: фактор {speed_factor:.2f}x для сохранения текста")
+                        adjusted_audio = audio.speedup(playback_speed=speed_factor)
+                    else:
+                        # Только при очень малых различиях допускаем небольшую обрезку
+                        target_ms = int(target_duration * 1000)
+                        adjusted_audio = audio[:target_ms]
+                        self.logger.info(f"🔧 TTS ОБРЕЗКА: минимальная обрезка {duration_diff:.2f}s")
                 else:
-                    # Обрезка аудио только при небольших различиях
-                    target_ms = int(target_duration * 1000)
-                    adjusted_audio = audio[:target_ms]
+                    # Для обычных файлов оставляем старую логику
+                    if duration_diff > 5.0:  # Если аудио длиннее на 5+ секунд
+                        self.logger.warning(f"⚠️ КРИТИЧНО: Аудио на {duration_diff:.1f}s длиннее целевой длительности!")
+                        self.logger.warning(f"💡 СОХРАНЯЕМ ВСЕ АУДИО для избежания потери смысла")
+                        # Возвращаем исходное аудио без обрезки
+                        adjusted_audio = audio
+                    else:
+                        # Обрезка аудио только при небольших различиях
+                        target_ms = int(target_duration * 1000)
+                        adjusted_audio = audio[:target_ms]
                 
             else:
                 # Добавление тишины в конец
@@ -356,10 +401,12 @@ class AudioProcessor:
             self.logger.info(f"  Финальный результат: {adjusted_path}")
             self.logger.info(f"  Финальные параметры: длительность={final_duration:.2f}s, громкость={final_dBFS:.1f}dBFS")
             
+            self.logger.info(f"🔧 adjust_audio_duration ЗАВЕРШЕНА УСПЕШНО: {Path(adjusted_path).name}")
             return str(adjusted_path)
             
         except Exception as e:
             self.logger.error(f"Ошибка подгонки длительности аудио: {e}")
+            self.logger.info(f"🔧 adjust_audio_duration ЗАВЕРШЕНА С ОШИБКОЙ: возвращаем исходный путь")
             return audio_path
     
     def normalize_audio_volume(self, audio_path: str, target_dBFS: float = -20.0) -> Optional[str]:

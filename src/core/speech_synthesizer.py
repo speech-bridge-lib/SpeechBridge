@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from config import config
+from core.tts_manual_selector import tts_manual_selector
 
 
 class SpeechSynthesizer:
@@ -27,15 +28,39 @@ class SpeechSynthesizer:
         self.default_language = self.config.TTS_LANGUAGE
         self.default_voice = self.config.TTS_VOICE
         
-        # Карта голосов: voice_id -> реальное имя голоса macOS
-        # Используем только Milena с одинаковыми параметрами для всех спикеров
+        # Карта голосов по языкам: language_code -> voice_info
+        self.language_voices = {
+            'ru': {'voice': 'Milena', 'fallback': 'Milena'},
+            'uk': {'voice': 'Lesya', 'fallback': 'Milena', 'quality_issues': True},  # Украинский голос с известными проблемами качества
+            'en': {'voice': 'Samantha', 'fallback': 'Alex'},
+            'de': {'voice': 'Anna', 'fallback': 'Markus'},
+            'fr': {'voice': 'Amelie', 'fallback': 'Thomas'},
+            'es': {'voice': 'Monica', 'fallback': 'Jorge'},
+            'it': {'voice': 'Alice', 'fallback': 'Luca'},
+            'pt': {'voice': 'Joana', 'fallback': 'Luciana'},
+            'zh': {'voice': 'Ting-Ting', 'fallback': 'Sin-ji'},
+            'ja': {'voice': 'Kyoko', 'fallback': 'Otoya'},
+            'ko': {'voice': 'Yuna', 'fallback': 'Yuna'},
+            'ar': {'voice': 'Maged', 'fallback': 'Maged'},
+            'tr': {'voice': 'Yelda', 'fallback': 'Yelda'},
+            'pl': {'voice': 'Zosia', 'fallback': 'Krzysztof'},
+            'nl': {'voice': 'Ellen', 'fallback': 'Xander'},
+            'sv': {'voice': 'Klara', 'fallback': 'Oskar'},
+            'no': {'voice': 'Nora', 'fallback': 'Henrik'},
+            'da': {'voice': 'Sara', 'fallback': 'Magnus'},
+            'fi': {'voice': 'Satu', 'fallback': 'Onni'},
+            # Добавляем fallback для неподдерживаемых языков
+            'default': {'voice': 'Samantha', 'fallback': 'Alex'}
+        }
+        
+        # Старая карта для обратной совместимости
         self.voice_map = {
-            'ru-male-1': 'Milena',
-            'ru-male-2': 'Milena',
-            'ru-male-3': 'Milena',
-            'ru-female-1': 'Milena',
-            'ru-female-2': 'Milena',
-            'ru-female-3': 'Milena',
+            'ru-male-1': self._get_voice_for_language('ru'),
+            'ru-male-2': self._get_voice_for_language('ru'),
+            'ru-male-3': self._get_voice_for_language('ru'),
+            'ru-female-1': self._get_voice_for_language('ru'),
+            'ru-female-2': self._get_voice_for_language('ru'),
+            'ru-female-3': self._get_voice_for_language('ru'),
         }
         
         # Стандартные параметры для всех голосов (без изменения тембра)
@@ -48,7 +73,70 @@ class SpeechSynthesizer:
             'ru-female-3': {'rate': 190, 'pitch_adj': 'normal'},
         }
         
+        # Языково-специфичные параметры голосов для улучшения качества
+        self.language_voice_params = {
+            'ru': {'rate': 190, 'pitch_adj': 'normal'},  # Русский
+            'uk': {'rate': 170, 'pitch_adj': 'normal'},  # Украинский
+            'en': {'rate': 200, 'pitch_adj': 'normal'},  # Английский
+            'de': {'rate': 180, 'pitch_adj': 'normal'},  # Немецкий
+            'fr': {'rate': 180, 'pitch_adj': 'normal'},  # Французский
+            'es': {'rate': 190, 'pitch_adj': 'normal'},  # Испанский
+            'it': {'rate': 185, 'pitch_adj': 'normal'},  # Итальянский
+            'pt': {'rate': 190, 'pitch_adj': 'normal'},  # Португальский
+            'pl': {'rate': 175, 'pitch_adj': 'normal'},  # Польский
+            'nl': {'rate': 185, 'pitch_adj': 'normal'},  # Голландский
+            'sv': {'rate': 180, 'pitch_adj': 'normal'},  # Шведский
+            'no': {'rate': 180, 'pitch_adj': 'normal'},  # Норвежский
+            'da': {'rate': 185, 'pitch_adj': 'normal'},  # Датский
+            'fi': {'rate': 160, 'pitch_adj': 'normal'},  # Финский - медленнее
+            'ar': {'rate': 160, 'pitch_adj': 'normal'},  # Арабский - медленнее
+            'tr': {'rate': 175, 'pitch_adj': 'normal'},  # Турецкий
+            'zh': {'rate': 220, 'pitch_adj': 'normal'},  # Китайский - быстрее
+            'ja': {'rate': 180, 'pitch_adj': 'normal'},  # Японский
+            'ko': {'rate': 190, 'pitch_adj': 'normal'},  # Корейский
+            'hi': {'rate': 170, 'pitch_adj': 'normal'},  # Хинди
+            'th': {'rate': 165, 'pitch_adj': 'normal'},  # Тайский
+            'vi': {'rate': 180, 'pitch_adj': 'normal'},  # Вьетнамский
+            'hu': {'rate': 170, 'pitch_adj': 'normal'},  # Венгерский
+            'cs': {'rate': 175, 'pitch_adj': 'normal'},  # Чешский
+            'sk': {'rate': 175, 'pitch_adj': 'normal'},  # Словацкий
+            'ro': {'rate': 180, 'pitch_adj': 'normal'},  # Румынский
+            'bg': {'rate': 175, 'pitch_adj': 'normal'},  # Болгарский
+            'hr': {'rate': 175, 'pitch_adj': 'normal'},  # Хорватский
+            'sl': {'rate': 175, 'pitch_adj': 'normal'},  # Словенский
+            'lv': {'rate': 170, 'pitch_adj': 'normal'},  # Латышский
+            'lt': {'rate': 170, 'pitch_adj': 'normal'},  # Литовский
+            'et': {'rate': 165, 'pitch_adj': 'normal'},  # Эстонский
+            'id': {'rate': 185, 'pitch_adj': 'normal'},  # Индонезийский
+            'ms': {'rate': 185, 'pitch_adj': 'normal'},  # Малайский
+            'el': {'rate': 180, 'pitch_adj': 'normal'},  # Греческий
+            'he': {'rate': 175, 'pitch_adj': 'normal'},  # Иврит
+        }
+        
         self.logger.debug("SpeechSynthesizer инициализирован")
+    
+    def _get_voice_for_language(self, language_code):
+        """Получить подходящий голос для языка"""
+        lang_info = self.language_voices.get(language_code.lower(), self.language_voices['default'])
+        return lang_info['voice']
+    
+    def _get_fallback_voice(self, language_code):
+        """Получить fallback голос для языка"""
+        lang_info = self.language_voices.get(language_code.lower(), self.language_voices['default'])
+        return lang_info['fallback']
+    
+    def set_target_language(self, target_language):
+        """Установить целевой язык для TTS"""
+        self.target_language = target_language.lower()
+        voice_info = self.language_voices.get(self.target_language, self.language_voices['default'])
+        voice_name = voice_info['voice']
+        
+        # Предупреждение о проблемах качества
+        if voice_info.get('quality_issues'):
+            self.logger.warning(f"⚠️ Голос {voice_name} для языка {target_language} имеет известные проблемы качества")
+            self.logger.info(f"🔄 Используем замедленную скорость речи для улучшения качества")
+        
+        self.logger.info(f"🌍 TTS язык установлен: {target_language} -> голос: {voice_name}")
 
     def synthesize_speech(
             self,
@@ -56,22 +144,65 @@ class SpeechSynthesizer:
             language: str = None,
             voice: str = None,
             speed: float = 1.0,
-            pitch: float = 0.0
+            pitch: float = 0.0,
+            target_duration: float = None
     ) -> Optional[str]:
         """
-        Синтез речи через macOS 'say' команду с поддержкой разных голосов
+        Синтез речи с использованием ручного селектора TTS движков
         """
         if not text or not text.strip():
             self.logger.debug("Пустой текст для синтеза")
             return None
 
-        language = language or self.default_language
-        voice = voice or self.default_voice
+        # Определяем язык
+        language = language or getattr(self, 'target_language', self.default_language)
+        
+        # Используем ручной селектор для выбора движка и голоса
+        effective_engine = tts_manual_selector.get_effective_engine_for_language(language)
+        effective_voice = voice or tts_manual_selector.get_effective_voice_for_language(language)
+        
+        self.logger.info(f"🎛️ TTS селектор: язык={language}, движок={effective_engine.value}, голос={effective_voice}")
+        
+        # Используем новую TTS фабрику для синтеза
+        result = tts_manual_selector.tts_factory.synthesize_with_engine(
+            text=text,
+            language=language,
+            engine=effective_engine,
+            voice_name=effective_voice,
+            target_duration=target_duration
+        )
+        
+        if result:
+            self.logger.info(f"✅ Синтез успешен через {effective_engine.value}")
+            return result
+        else:
+            self.logger.warning(f"⚠️ Синтез не удался через {effective_engine.value}, пробуем старый способ...")
+            
+        # Fallback на старый метод, если новый не сработал
+        language = language or getattr(self, 'target_language', self.default_language)
+        
+        # Если голос не указан, автоматически выбираем по языку
+        if not voice:
+            voice = self._get_voice_for_language(language)
+        
+        # Если голос указан как старый формат (ru-male-1), используем маппинг
+        if voice in self.voice_map:
+            voice = self.voice_map[voice]
 
         try:
-            # Получаем реальное имя голоса macOS и параметры
-            macos_voice = self._get_macos_voice(voice)
-            voice_params = self._get_voice_params(voice)
+            # Для украинского языка сразу используем Google TTS (более надежный)
+            if language and language.lower() == 'uk':
+                self.logger.info(f"🇺🇦 Украинский текст: используем Google TTS (основной) для '{text[:50]}...'")
+                google_result = self._synthesize_with_google_tts_ukrainian(text)
+                if google_result:
+                    self.logger.info("✅ Использован Google TTS для украинского языка (основной)")
+                    return google_result
+                else:
+                    self.logger.warning("⚠️ Google TTS недоступен, пробуем Lesya как fallback")
+            
+            # Для всех остальных языков или если Google TTS недоступен для украинского
+            macos_voice = self._get_macos_voice(voice, language)
+            voice_params = self._get_voice_params(voice, language)
             
             self.logger.info(f"🎤 Синтез речи через {macos_voice} ({voice}): '{text[:50]}...'")
 
@@ -79,15 +210,167 @@ class SpeechSynthesizer:
             result = self._synthesize_with_say_voice_params(text, language, macos_voice, voice_params)
 
             if result:
+                # Проверяем качество украинского TTS - файл и длительность
+                if language and language.lower() == 'uk':
+                    from pathlib import Path
+                    if Path(result).exists():
+                        file_size = Path(result).stat().st_size
+                        
+                        # Проверяем длительность аудио
+                        try:
+                            from pydub import AudioSegment
+                            audio = AudioSegment.from_wav(result)
+                            duration = len(audio) / 1000.0  # в секундах
+                            expected_duration = len(text) / 8.0  # примерно 8 символов в секунду для украинского
+                            
+                            # Проверяем на подозрительные проблемы
+                            is_small_file = len(text) > 50 and file_size < 30000
+                            is_short_audio = duration < expected_duration * 0.3  # менее 30% ожидаемой длительности
+                            is_suspiciously_uniform = self._check_audio_uniformity(audio)  # проверка на монотонные звуки
+                            
+                            if is_small_file or is_short_audio or is_suspiciously_uniform:
+                                reason = []
+                                if is_small_file: reason.append("малый размер")
+                                if is_short_audio: reason.append("короткая длительность") 
+                                if is_suspiciously_uniform: reason.append("подозрительный звук")
+                                
+                                self.logger.warning(f"⚠️ Проблема с украинским TTS: {', '.join(reason)} (размер={file_size}байт, длительность={duration:.1f}с)")
+                                self.logger.info("🔄 Переключаемся на Google TTS для украинского языка...")
+                                google_result = self._synthesize_with_google_tts_ukrainian(text)
+                                if google_result:
+                                    self.logger.info("✅ Использован Google TTS вместо проблемного Lesya")
+                                    # Удаляем проблемный файл
+                                    try:
+                                        Path(result).unlink()
+                                    except:
+                                        pass
+                                    return google_result
+                        except Exception as e:
+                            self.logger.debug(f"Ошибка проверки украинского аудио: {e}")
+                
                 self.logger.info(f"✅ Использован macOS 'say' с голосом {macos_voice} (параметры: {voice_params})")
                 return result
             else:
                 self.logger.error("❌ macOS 'say' команда недоступна")
+                
+                # Для украинского языка пробуем Google TTS как fallback
+                if language and language.lower() == 'uk':
+                    self.logger.info("🔄 Пробуем Google TTS для украинского языка...")
+                    google_result = self._synthesize_with_google_tts_ukrainian(text)
+                    if google_result:
+                        self.logger.info("✅ Использован Google TTS для украинского языка")
+                        return google_result
+                
                 return None
 
         except Exception as e:
             self.logger.error(f"Критическая ошибка синтеза речи: {e}")
             return None
+    
+    def _synthesize_with_google_tts_ukrainian(self, text: str) -> Optional[str]:
+        """Синтез украинского текста через Google TTS как fallback"""
+        try:
+            from gtts import gTTS
+            import io
+            
+            # Создаем объект gTTS для украинского языка
+            tts = gTTS(text=text, lang='uk', slow=False)
+            
+            # Сохраняем во временный файл
+            temp_path = self.config.get_temp_filename("google_tts_ukrainian", ".mp3")
+            tts.save(str(temp_path))
+            
+            if not Path(temp_path).exists():
+                self.logger.error("❌ Google TTS не создал файл")
+                return None
+            
+            # Конвертируем MP3 в WAV через pydub
+            wav_path = self._convert_mp3_to_wav(temp_path)
+            if wav_path:
+                # Удаляем временный MP3
+                try:
+                    Path(temp_path).unlink()
+                except:
+                    pass
+                return wav_path
+            
+            return None
+            
+        except ImportError:
+            self.logger.error("❌ gTTS не установлен")
+            return None
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка Google TTS для украинского: {e}")
+            return None
+    
+    def _convert_mp3_to_wav(self, mp3_path: str) -> Optional[str]:
+        """Конвертация MP3 в WAV через pydub"""
+        try:
+            from pydub import AudioSegment
+            
+            wav_path = self.config.get_temp_filename("google_tts_converted", ".wav")
+            
+            # Загружаем MP3 файл
+            audio = AudioSegment.from_mp3(mp3_path)
+            
+            # Экспортируем как WAV с оптимальными параметрами
+            audio.export(str(wav_path), format="wav", parameters=["-acodec", "pcm_s16le", "-ar", "22050", "-ac", "1"])
+            
+            if Path(wav_path).exists() and Path(wav_path).stat().st_size > 1000:
+                self.logger.info(f"✅ MP3 -> WAV конвертация успешна: {wav_path}")
+                return str(wav_path)
+            else:
+                self.logger.error("❌ Конвертация MP3 -> WAV неудачна")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"❌ Ошибка конвертации MP3 -> WAV: {e}")
+            return None
+    
+    def _check_audio_uniformity(self, audio_segment) -> bool:
+        """
+        Проверяет аудио на подозрительную монотонность (как звук 'Ба-а-анг')
+        
+        Args:
+            audio_segment: объект AudioSegment
+            
+        Returns:
+            bool: True если аудио подозрительно монотонное
+        """
+        try:
+            # Простая проверка: если аудио слишком тихое или слишком громкое
+            loudness = audio_segment.dBFS
+            
+            # Если звук аномально тихий (меньше -40dB) или слишком громкий (больше -5dB)
+            if loudness < -40 or loudness > -5:
+                return True
+                
+            # Проверяем вариацию громкости - речь должна иметь динамику
+            # Разбиваем аудио на сегменты и проверяем разброс громкости
+            if len(audio_segment) > 1000:  # если больше 1 секунды
+                chunk_size = len(audio_segment) // 10  # делим на 10 частей
+                loudness_values = []
+                
+                for i in range(0, len(audio_segment), chunk_size):
+                    chunk = audio_segment[i:i+chunk_size]
+                    if len(chunk) > 100:  # минимум 100мс
+                        loudness_values.append(chunk.dBFS)
+                
+                if len(loudness_values) >= 3:
+                    # Проверяем разброс громкости
+                    max_loud = max(loudness_values)
+                    min_loud = min(loudness_values)
+                    variation = max_loud - min_loud
+                    
+                    # Если вариация меньше 3dB, это подозрительно монотонно
+                    if variation < 3.0:
+                        return True
+            
+            return False
+            
+        except Exception as e:
+            # При ошибке считаем, что аудио нормальное
+            return False
 
     # def synthesize_speech(
     #     self,
@@ -497,36 +780,163 @@ class SpeechSynthesizer:
             self.logger.error(f"pyttsx3 ошибка: {e}")
             return None
     
-    def _get_macos_voice(self, voice_id: str) -> str:
+    def _get_macos_voice(self, voice_id: str, language: str = None) -> str:
         """
-        Получает реальное имя голоса macOS по voice_id
+        Получает реальное имя голоса macOS по voice_id или языку
         
         Args:
-            voice_id: идентификатор голоса из системы speaker diarization
+            voice_id: идентификатор голоса
+            language: код языка для автоматического выбора голоса
             
         Returns:
             str: имя голоса macOS
         """
+        # Если voice_id в старой карте голосов, используем его
         if voice_id in self.voice_map:
             return self.voice_map[voice_id]
-        else:
-            self.logger.warning(f"⚠️ Неизвестный voice_id: {voice_id}, используем Milena")
-            return 'Milena'
+        
+        # Если voice_id это уже имя голоса macOS, возвращаем как есть
+        if voice_id in ['Milena', 'Lesya', 'Samantha', 'Alex', 'Anna', 'Markus', 
+                       'Amelie', 'Thomas', 'Monica', 'Jorge', 'Alice', 'Luca',
+                       'Joana', 'Luciana', 'Ting-Ting', 'Sin-ji', 'Kyoko', 'Otoya',
+                       'Yuna', 'Maged', 'Yelda', 'Zosia', 'Krzysztof', 'Ellen',
+                       'Xander', 'Klara', 'Oskar', 'Nora', 'Henrik', 'Sara',
+                       'Magnus', 'Satu', 'Onni']:
+            return voice_id
+        
+        # Если указан язык, выбираем голос по языку
+        if language:
+            voice = self._get_voice_for_language(language)
+            self.logger.info(f"🎤 Автоматический выбор голоса для {language}: {voice}")
+            return voice
+        
+        # Fallback
+        self.logger.warning(f"⚠️ Неизвестный voice_id: {voice_id}, используем Samantha")
+        return 'Samantha'
     
-    def _get_voice_params(self, voice_id: str) -> Dict:
+    def _get_voice_params(self, voice_id: str, language: str = None) -> Dict:
         """
-        Получает параметры голоса
+        Получает базовые параметры голоса для языка (без автоматической адаптации скорости)
         
         Args:
             voice_id: идентификатор голоса
+            language: код языка для языково-специфичных параметров
             
         Returns:
-            Dict: параметры голоса (rate, pitch_adj)
+            Dict: базовые параметры голоса (rate, pitch_adj)
         """
+        # Получаем базовые параметры для языка
+        base_params = self.language_voice_params.get(language.lower() if language else 'ru', {'rate': 190, 'pitch_adj': 'normal'})
+        
+        # ОТКЛЮЧАЕМ автоматический подбор скорости - используем только базовые языковые скорости
+        # Синхронизация полностью контролируется через audio_processor.adjust_audio_duration
+        self.logger.debug(f"🎵 {language.upper() if language else 'DEFAULT'}: используем базовую скорость {base_params['rate']} (автоподбор отключен)")
+        return base_params
+        
+        # Проверяем старые параметры голосов для обратной совместимости
         if voice_id in self.voice_params:
             return self.voice_params[voice_id]
+        
+        return base_params
+    
+    def _calculate_conservative_rate_universal(self, text_length: int, target_duration: float, base_rate: int, language: str) -> int:
+        """
+        Консервативно корректирует скорость речи только в крайних случаях для сохранения синхронизации
+        
+        Args:
+            text_length: длина текста в символах
+            target_duration: целевая длительность в секундах
+            base_rate: базовая скорость
+            language: код языка для специфичных настроек
+            
+        Returns:
+            int: скорректированная скорость речи (или базовая, если коррекция не нужна)
+        """
+        # Языково-специфичные коэффициенты и ограничения
+        language_configs = {
+            # Арабские и семитские языки - медленнее для ясности
+            'ar': {'min_rate': 120, 'max_rate': 200, 'speed_factor': 0.9},  # Арабский
+            'he': {'min_rate': 130, 'max_rate': 210, 'speed_factor': 0.95}, # Иврит
+            
+            # Азиатские языки
+            'zh': {'min_rate': 140, 'max_rate': 280, 'speed_factor': 1.2},  # Китайский - быстрее
+            'ja': {'min_rate': 130, 'max_rate': 220, 'speed_factor': 1.0},  # Японский
+            'ko': {'min_rate': 140, 'max_rate': 230, 'speed_factor': 1.1},  # Корейский
+            'th': {'min_rate': 130, 'max_rate': 200, 'speed_factor': 0.9},  # Тайский
+            'vi': {'min_rate': 140, 'max_rate': 220, 'speed_factor': 1.0},  # Вьетнамский
+            'hi': {'min_rate': 130, 'max_rate': 210, 'speed_factor': 0.95}, # Хинди
+            'id': {'min_rate': 140, 'max_rate': 220, 'speed_factor': 1.0},  # Индонезийский
+            'ms': {'min_rate': 140, 'max_rate': 220, 'speed_factor': 1.0},  # Малайский
+            
+            # Тюркские языки
+            'tr': {'min_rate': 140, 'max_rate': 220, 'speed_factor': 1.0},  # Турецкий
+            
+            # Финно-угорские языки - медленнее
+            'fi': {'min_rate': 120, 'max_rate': 200, 'speed_factor': 0.9},  # Финский
+            'hu': {'min_rate': 130, 'max_rate': 210, 'speed_factor': 0.95}, # Венгерский
+            'et': {'min_rate': 120, 'max_rate': 200, 'speed_factor': 0.9},  # Эстонский
+            
+            # Славянские языки
+            'ru': {'min_rate': 140, 'max_rate': 240, 'speed_factor': 1.0},  # Русский
+            'uk': {'min_rate': 130, 'max_rate': 220, 'speed_factor': 0.95}, # Украинский
+            'pl': {'min_rate': 130, 'max_rate': 220, 'speed_factor': 0.95}, # Польский
+            'cs': {'min_rate': 130, 'max_rate': 220, 'speed_factor': 0.95}, # Чешский
+            'sk': {'min_rate': 130, 'max_rate': 220, 'speed_factor': 0.95}, # Словацкий
+            'bg': {'min_rate': 130, 'max_rate': 220, 'speed_factor': 0.95}, # Болгарский
+            'hr': {'min_rate': 130, 'max_rate': 220, 'speed_factor': 0.95}, # Хорватский
+            'sl': {'min_rate': 130, 'max_rate': 220, 'speed_factor': 0.95}, # Словенский
+            
+            # Балтийские языки
+            'lv': {'min_rate': 125, 'max_rate': 210, 'speed_factor': 0.9},  # Латышский
+            'lt': {'min_rate': 125, 'max_rate': 210, 'speed_factor': 0.9},  # Литовский
+            
+            # Романские языки
+            'fr': {'min_rate': 140, 'max_rate': 220, 'speed_factor': 1.0},  # Французский
+            'es': {'min_rate': 140, 'max_rate': 230, 'speed_factor': 1.05}, # Испанский - чуть быстрее
+            'it': {'min_rate': 140, 'max_rate': 225, 'speed_factor': 1.0},  # Итальянский
+            'pt': {'min_rate': 140, 'max_rate': 230, 'speed_factor': 1.05}, # Португальский
+            'ro': {'min_rate': 135, 'max_rate': 220, 'speed_factor': 1.0},  # Румынский
+            
+            # Германские языки
+            'en': {'min_rate': 150, 'max_rate': 250, 'speed_factor': 1.1},  # Английский - быстрее
+            'de': {'min_rate': 140, 'max_rate': 220, 'speed_factor': 1.0},  # Немецкий
+            'nl': {'min_rate': 140, 'max_rate': 225, 'speed_factor': 1.0},  # Голландский
+            'sv': {'min_rate': 140, 'max_rate': 220, 'speed_factor': 1.0},  # Шведский
+            'no': {'min_rate': 140, 'max_rate': 220, 'speed_factor': 1.0},  # Норвежский
+            'da': {'min_rate': 140, 'max_rate': 225, 'speed_factor': 1.0},  # Датский
+            
+            # Изолированные языки
+            'el': {'min_rate': 135, 'max_rate': 220, 'speed_factor': 1.0},  # Греческий
+            
+            'default': {'min_rate': 130, 'max_rate': 220, 'speed_factor': 1.0}  # По умолчанию
+        }
+        
+        # Получаем конфигурацию для языка
+        config = language_configs.get(language.lower(), language_configs['default'])
+        
+        # Примерная скорость произношения: символов в секунду
+        chars_per_second = text_length / target_duration if target_duration > 0 else 10
+        
+        # КОНСЕРВАТИВНАЯ коррекция: вмешиваемся только в крайних случаях
+        # Основная синхронизация идет через audio_processor.adjust_audio_duration
+        
+        # Случай 1: Слишком быстрый текст (>20 символов/сек) - слегка ускоряем TTS
+        if chars_per_second > 20:
+            adaptive_rate = min(config['max_rate'], int(base_rate * 1.15))
+            
+        # Случай 2: Экстремально медленный текст (<3 символов/сек) - замедляем TTS  
+        elif chars_per_second < 3:
+            adaptive_rate = max(config['min_rate'], int(base_rate * 0.85))
+            
+        # Случай 3: Украинский язык с известными проблемами качества - слегка замедляем
+        elif language.lower() == 'uk' and chars_per_second < 8:
+            adaptive_rate = max(config['min_rate'], int(base_rate * 0.92))
+            
+        # Во всех остальных случаях используем базовую скорость
         else:
-            return {'rate': 190, 'pitch_adj': 'normal'}  # Стандартные параметры
+            adaptive_rate = base_rate
+        
+        return adaptive_rate
     
     def _synthesize_with_say_voice_params(self, text: str, language: str, voice_name: str, params: Dict) -> Optional[str]:
         """Синтез речи через macOS 'say' команду с указанным голосом и параметрами"""
