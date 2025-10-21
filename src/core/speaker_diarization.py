@@ -27,13 +27,23 @@ class SpeakerDiarization:
         }
         self.used_voices = {'male': 0, 'female': 0}
         
-    def segment_by_speakers(self, audio_path: str, min_speaker_duration: float = 5.0) -> List[Dict]:
+        # Voice cloner integration
+        self.voice_cloner = None
+        self.voice_samples_cache = {}  # Cache for extracted voice samples
+        
+    def enable_voice_cloning(self, voice_cloner):
+        """Enable voice cloning integration"""
+        self.voice_cloner = voice_cloner
+        self.logger.info("🎭 Voice cloning integration enabled")
+        
+    def segment_by_speakers(self, audio_path: str, min_speaker_duration: float = 5.0, extract_voice_samples: bool = True) -> List[Dict]:
         """
         Сегментирует аудио по спикерам
         
         Args:
             audio_path: путь к аудио файлу
             min_speaker_duration: минимальная длительность сегмента спикера
+            extract_voice_samples: если True, извлекает образцы голоса для клонирования
             
         Returns:
             list: список сегментов с информацией о спикерах
@@ -54,6 +64,11 @@ class SpeakerDiarization:
                     segment['voice_id'] = 'ru-female-1'  # Используем основной голос
             
             self.logger.info(f"✅ Создано {len(segments)} сегментов по спикерам")
+            
+            # Extract voice samples for voice cloning if enabled
+            if extract_voice_samples and self.voice_cloner and segments:
+                self._extract_voice_samples_for_cloning(audio_path, segments)
+            
             return segments
             
         except Exception as e:
@@ -735,3 +750,87 @@ class SpeakerDiarization:
         self.used_voices[gender] += 1
         
         return voice_id
+    
+    def _extract_voice_samples_for_cloning(self, audio_path: str, segments: List[Dict]) -> None:
+        """
+        Extract voice samples for each speaker for voice cloning
+        
+        Args:
+            audio_path: path to the original audio file
+            segments: list of speaker segments
+        """
+        try:
+            self.logger.info("🎤 Extracting voice samples for voice cloning...")
+            
+            # Group segments by speaker
+            speakers_segments = {}
+            for segment in segments:
+                speaker_id = segment['speaker']
+                if speaker_id not in speakers_segments:
+                    speakers_segments[speaker_id] = []
+                speakers_segments[speaker_id].append(segment)
+            
+            # Extract samples for each speaker
+            for speaker_id, speaker_segments in speakers_segments.items():
+                if speaker_id in self.voice_samples_cache:
+                    continue  # Already have sample for this speaker
+                
+                # Find the longest segment for this speaker (best quality sample)
+                best_segment = max(speaker_segments, key=lambda x: x['duration'])
+                
+                # Only extract if segment is long enough (minimum 3 seconds for good voice cloning)
+                if best_segment['duration'] >= 3.0:
+                    sample_path = best_segment['path']
+                    
+                    # Extract voice characteristics using voice cloner
+                    characteristics = self.voice_cloner.extract_voice_characteristics(
+                        sample_path, speaker_id=speaker_id
+                    )
+                    
+                    if characteristics:
+                        # Cache the voice sample and characteristics
+                        self.voice_samples_cache[speaker_id] = {
+                            'sample_path': sample_path,
+                            'characteristics': characteristics,
+                            'duration': best_segment['duration'],
+                            'confidence': best_segment.get('speaker_confidence', 0.5)
+                        }
+                        
+                        self.logger.info(f"✅ Voice sample extracted for {speaker_id}: {best_segment['duration']:.1f}s")
+                    else:
+                        self.logger.warning(f"⚠️ Failed to extract characteristics for {speaker_id}")
+                else:
+                    self.logger.warning(f"⚠️ Segment too short for {speaker_id}: {best_segment['duration']:.1f}s")
+            
+            # Add voice sample information to segments
+            for segment in segments:
+                speaker_id = segment['speaker']
+                if speaker_id in self.voice_samples_cache:
+                    segment['voice_sample_path'] = self.voice_samples_cache[speaker_id]['sample_path']
+                    segment['voice_characteristics'] = self.voice_samples_cache[speaker_id]['characteristics']
+            
+            self.logger.info(f"🎭 Voice samples extracted for {len(self.voice_samples_cache)} speakers")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error extracting voice samples: {e}")
+    
+    def get_voice_sample(self, speaker_id: str) -> Optional[Dict]:
+        """
+        Get cached voice sample for a speaker
+        
+        Args:
+            speaker_id: speaker identifier
+            
+        Returns:
+            dict: voice sample information or None if not found
+        """
+        return self.voice_samples_cache.get(speaker_id)
+    
+    def get_all_voice_samples(self) -> Dict[str, Dict]:
+        """
+        Get all cached voice samples
+        
+        Returns:
+            dict: mapping of speaker_id to voice sample information
+        """
+        return self.voice_samples_cache.copy()

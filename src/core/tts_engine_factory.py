@@ -18,6 +18,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from config import config
+from core.voice_cloner import VoiceCloner
 
 
 class TTSEngine(Enum):
@@ -28,6 +29,7 @@ class TTSEngine(Enum):
     UKRAINIAN_TTS = "ukrainian_tts"  # ESPnet-based Ukrainian TTS
     RADTTS_UK = "radtts_uk"         # RADTTS Ukrainian model
     PORETSKY_RU = "poretsky_ru"     # Poretsky Russian TTS
+    VOICE_CLONING = "voice_cloning"  # Custom voice cloning engine
     AUTO = "auto"  # Автоматический выбор лучшего движка для языка
 
 
@@ -117,11 +119,23 @@ class TTSEngineFactory:
                 speed_score=7,
                 cost="free",
                 limitations="Только русский язык, требует установки зависимостей"
+            ),
+            TTSEngine.VOICE_CLONING: TTSEngineInfo(
+                name="Voice Cloning TTS",
+                description="Клонирование голоса на основе образцов речи из диаризации",
+                supported_languages=["ru", "uk", "en", "de", "fr", "es", "it", "pt", "pl"],
+                quality_score=9,
+                speed_score=5,
+                cost="free",
+                limitations="Требует образцы голоса для клонирования, медленнее стандартных TTS"
             )
         }
         
         # Определяем доступные голоса для каждого движка
         self.available_voices = self._discover_available_voices()
+        
+        # Initialize voice cloner
+        self.voice_cloner = VoiceCloner(self.config)
         
         # Рекомендуемые движки для каждого языка (в порядке приоритета)
         self.language_engine_priority = {
@@ -303,8 +317,22 @@ class TTSEngineFactory:
         # Poretsky Russian TTS - всегда добавляем (с fallback)
         available.append(TTSEngine.PORETSKY_RU)
         
+        # Voice Cloning - доступен если включен в конфигурации
+        if hasattr(self.config, 'USE_VOICE_CLONING') and self.config.USE_VOICE_CLONING:
+            available.append(TTSEngine.VOICE_CLONING)
+        
         available.append(TTSEngine.AUTO)
         return available
+    
+    def get_engine_info(self, engine) -> Optional[TTSEngineInfo]:
+        """Получить информацию о движке"""
+        # Convert string to enum if needed
+        if isinstance(engine, str):
+            try:
+                engine = TTSEngine(engine)
+            except ValueError:
+                return None
+        return self.engines_info.get(engine)
     
     def get_recommended_engine(self, language: str) -> TTSEngine:
         """Получить рекомендуемый движок для языка"""
@@ -353,11 +381,20 @@ class TTSEngineFactory:
         self, 
         text: str, 
         language: str,
-        engine: TTSEngine = TTSEngine.AUTO,
+        engine = TTSEngine.AUTO,
         voice_name: str = None,
-        target_duration: float = None
+        target_duration: float = None,
+        **kwargs
     ) -> Optional[str]:
         """Синтез речи с указанным движком"""
+        
+        # Convert string to enum if needed
+        if isinstance(engine, str):
+            try:
+                engine = TTSEngine(engine)
+            except ValueError:
+                self.logger.error(f"❌ Неизвестный движок TTS: {engine}")
+                return None
         
         if engine == TTSEngine.AUTO:
             engine = self.get_recommended_engine(language)
@@ -377,6 +414,10 @@ class TTSEngineFactory:
                 return self._synthesize_radtts_uk(text, language)
             elif engine == TTSEngine.PORETSKY_RU:
                 return self._synthesize_poretsky_ru(text, language)
+            elif engine == TTSEngine.VOICE_CLONING:
+                return self._synthesize_voice_cloning(text, language, 
+                                                   speaker_id=kwargs.get('speaker_id'), 
+                                                   target_duration=target_duration)
             else:
                 self.logger.error(f"Неподдерживаемый движок: {engine}")
                 return None
@@ -648,6 +689,98 @@ class TTSEngineFactory:
         except Exception as e:
             self.logger.error(f"❌ Ошибка Poretsky TTS: {e}")
             return None
+    
+    def _synthesize_voice_cloning(self, text: str, language: str, speaker_id: str = None,
+                                target_duration: float = None) -> Optional[str]:
+        """Синтез с клонированием голоса"""
+        try:
+            self.logger.info(f"🎤 Voice cloning: text='{text[:50]}...', language={language}, speaker_id={speaker_id}")
+
+            # Check if voice cloning is enabled in config
+            if not getattr(self.config, 'voice_cloning_enabled', True):
+                self.logger.debug("Voice cloning disabled, falling back to Google TTS")
+                return self._synthesize_google_tts(text, language, target_duration)
+            
+            # If no speaker_id provided or no voice profile available, fallback to Google TTS
+            if not speaker_id:
+                self.logger.debug("No speaker ID provided for voice cloning, using Google TTS")
+                return self._synthesize_google_tts(text, language, target_duration)
+            
+            # Get voice profile for speaker
+            voice_profile = self.voice_cloner.get_voice_profile(speaker_id)
+            if not voice_profile:
+                self.logger.debug(f"No voice profile found for speaker {speaker_id}, using Google TTS")
+                return self._synthesize_google_tts(text, language, target_duration)
+            
+            # First generate base TTS audio using Google TTS
+            base_tts_path = self._synthesize_google_tts(text, language, target_duration)
+            if not base_tts_path:
+                self.logger.error("Failed to generate base TTS for voice cloning")
+                return None
+            
+            # Find reference voice sample for this speaker
+            reference_audio = None
+
+            # First check if voice cloner has a profile for this speaker (with audio path)
+            voice_profile = self.voice_cloner.get_voice_profile(speaker_id)
+            if voice_profile:
+                self.logger.debug(f"Found voice profile for {speaker_id}")
+                # Voice profile contains characteristics but we need the actual audio file
+                # Check temp directory for voice segments (try both temp and src/temp)
+                temp_dirs = [Path("temp"), Path("src/temp")]
+                for temp_dir in temp_dirs:
+                    for temp_file in temp_dir.glob("voice_segment_*.wav"):
+                        # This is a simple approach - could be improved with proper mapping
+                        reference_audio = str(temp_file)
+                        self.logger.debug(f"Using temp voice segment for {speaker_id}: {reference_audio}")
+                        break
+                    if reference_audio:
+                        break
+
+            # Fallback: look for voice sample files in the directory
+            if not reference_audio:
+                voice_samples_dir = Path("temp/voice_profiles")
+                for sample_file in voice_samples_dir.glob(f"{speaker_id}_sample_*.wav"):
+                    reference_audio = str(sample_file)
+                    break
+
+            if not reference_audio or not Path(reference_audio).exists():
+                self.logger.warning(f"No reference audio found for speaker {speaker_id}, using base TTS")
+                self.logger.warning(f"Voice profile exists: {voice_profile is not None}")
+                self.logger.warning(f"Reference audio path: {reference_audio}")
+                return base_tts_path
+
+            self.logger.info(f"🎤 Found reference audio for {speaker_id}: {reference_audio}")
+            
+            # Generate cloned voice audio
+            output_dir = Path("temp")
+            output_dir.mkdir(exist_ok=True)
+            cloned_audio_path = output_dir / f"voice_cloned_{language}_{hash(text) % 10000}.wav"
+            
+            # Apply voice cloning
+            result = self.voice_cloner.clone_voice(
+                tts_audio_path=base_tts_path,
+                reference_voice_path=reference_audio,
+                output_path=str(cloned_audio_path),
+                target_duration=target_duration
+            )
+            
+            if result:
+                self.logger.info(f"✅ Voice cloning successful for speaker {speaker_id}: {result}")
+                # Clean up base TTS file
+                try:
+                    Path(base_tts_path).unlink()
+                except:
+                    pass
+                return result
+            else:
+                self.logger.warning(f"⚠️ Voice cloning failed for speaker {speaker_id}, using base TTS")
+                return base_tts_path
+                
+        except Exception as e:
+            self.logger.error(f"❌ Voice cloning error: {e}")
+            # Fallback to Google TTS
+            return self._synthesize_google_tts(text, language, target_duration)
     
     def _get_fallback_engine(self, failed_engine: TTSEngine, language: str) -> Optional[TTSEngine]:
         """Получить резервный движок"""

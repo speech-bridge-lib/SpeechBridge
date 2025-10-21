@@ -86,11 +86,20 @@ class Config:
     TTS_ENGINE_PRIORITY = ['pyttsx3']  # только pyttsx3
 
     # === ЭКСПЕРИМЕНТАЛЬНЫЕ ФУНКЦИИ ===
-    USE_SPEAKER_DIARIZATION = False  # Сегментация по спикерам (отключено для лучшей сегментации)
+    USE_SPEAKER_DIARIZATION = False  # Сегментация по спикерам отключена - не нужна без voice cloning
     USE_ADAPTIVE_VIDEO_TIMING = False  # Адаптивная синхронизация видео - ОТКЛЮЧЕНО ДЛЯ ТЕСТА
     USE_BLOCK_SYNCHRONIZATION = True  # Блочная синхронизация видео (новый подход)
     ADJUST_VIDEO_SPEED = True  # Замедление видео по сегментов для синхронизации
     USE_GENDER_DETECTION = False  # Определение пола спикеров (отключено - используем один голос)
+    
+    # === VOICE CLONING SETTINGS ===
+    USE_VOICE_CLONING = False  # Выключить клонирование голоса - лучше качество произношения у Google TTS
+    VOICE_CLONING_ENGINE = 'voice_cloning'  # Движок TTS для клонирования голоса
+    VOICE_CLONING_FALLBACK_ENGINE = 'google_tts'  # Запасной движок при ошибке клонирования
+    VOICE_CLONING_MIN_SAMPLE_DURATION = 3.0  # Минимальная длительность образца для клонирования (секунды)
+    VOICE_CLONING_MAX_PITCH_SHIFT = 12  # Максимальное изменение тона в полутонах
+    VOICE_CLONING_QUALITY_THRESHOLD = 0.7  # Порог качества для использования клонированного голоса
+    VOICE_CLONING_CACHE_SAMPLES = True  # Кэшировать образцы голоса для повторного использования
     
     # === ДОПОЛНИТЕЛЬНЫЕ API ===
     DEEPL_API_KEY = os.getenv('DEEPL_API_KEY')
@@ -147,6 +156,17 @@ class Config:
                 self.AUDIO_CHANNELS = quality_config.get('audio_channels', self.AUDIO_CHANNELS)
                 self.VIDEO_CODEC = quality_config.get('video_codec', self.VIDEO_CODEC)
                 self.AUDIO_CODEC = quality_config.get('audio_codec', self.AUDIO_CODEC)
+            
+            # Voice Cloning
+            if 'voice_cloning' in proc_config:
+                vc_config = proc_config['voice_cloning']
+                self.USE_VOICE_CLONING = vc_config.get('enabled', self.USE_VOICE_CLONING)
+                self.VOICE_CLONING_ENGINE = vc_config.get('engine', self.VOICE_CLONING_ENGINE)
+                self.VOICE_CLONING_FALLBACK_ENGINE = vc_config.get('fallback_engine', self.VOICE_CLONING_FALLBACK_ENGINE)
+                self.VOICE_CLONING_MIN_SAMPLE_DURATION = vc_config.get('min_sample_duration', self.VOICE_CLONING_MIN_SAMPLE_DURATION)
+                self.VOICE_CLONING_MAX_PITCH_SHIFT = vc_config.get('max_pitch_shift', self.VOICE_CLONING_MAX_PITCH_SHIFT)
+                self.VOICE_CLONING_QUALITY_THRESHOLD = vc_config.get('quality_threshold', self.VOICE_CLONING_QUALITY_THRESHOLD)
+                self.VOICE_CLONING_CACHE_SAMPLES = vc_config.get('cache_samples', self.VOICE_CLONING_CACHE_SAMPLES)
         
         # Логирование
         if 'logging' in yaml_config:
@@ -278,6 +298,130 @@ class ProductionConfig(Config):
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY', os.urandom(32))
 
 
+class CommercialConfig(ProductionConfig):
+    """Коммерческая конфигурация для enterprise использования"""
+
+    # === КОММЕРЧЕСКИЕ НАСТРОЙКИ ===
+    COMMERCIAL_VERSION = True
+    LICENSE_KEY_REQUIRED = True
+    USAGE_TRACKING_ENABLED = True
+
+    # === УВЕЛИЧЕННЫЕ ЛИМИТЫ ===
+    MAX_CONTENT_LENGTH = 2 * 1024 * 1024 * 1024  # 2GB для коммерческих клиентов
+    MAX_FILE_SIZE_MB = int(os.getenv('COMMERCIAL_MAX_FILE_SIZE_MB', '2048'))
+    MAX_DURATION_MINUTES = int(os.getenv('COMMERCIAL_MAX_DURATION_MINUTES', '180'))  # 3 часа
+
+    # === РАСШИРЕННЫЕ ФОРМАТЫ ===
+    ALLOWED_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.3gp', '.ogv'}
+
+    # === УЛУЧШЕННОЕ КАЧЕСТВО ===
+    AUDIO_SAMPLE_RATE = 48000  # Профессиональное качество
+    AUDIO_CHANNELS = 2  # Стерео для коммерческого использования
+    VIDEO_CODEC = 'libx264'
+    AUDIO_CODEC = 'aac'
+    VIDEO_CRF = 18  # Высокое качество видео (нижше = лучше)
+    AUDIO_BITRATE = '320k'  # Высокое качество аудио
+
+    # === ПАРАЛЛЕЛЬНАЯ ОБРАБОТКА ===
+    MAX_CONCURRENT_JOBS = int(os.getenv('MAX_CONCURRENT_JOBS', '4'))
+    ENABLE_BATCH_PROCESSING = True
+    BATCH_SIZE = int(os.getenv('BATCH_SIZE', '10'))
+
+    # === API RATE LIMITING ===
+    API_RATE_LIMIT_ENABLED = True
+    GOOGLE_API_CALLS_PER_MINUTE = int(os.getenv('GOOGLE_API_CALLS_PER_MINUTE', '300'))
+    DEEPL_API_CALLS_PER_MINUTE = int(os.getenv('DEEPL_API_CALLS_PER_MINUTE', '500'))
+
+    # === РЕЗЕРВНОЕ КОПИРОВАНИЕ ===
+    BACKUP_ENABLED = True
+    BACKUP_RETENTION_DAYS = int(os.getenv('BACKUP_RETENTION_DAYS', '30'))
+
+    # === МОНИТОРИНГ И АНАЛИТИКА ===
+    PERFORMANCE_MONITORING = True
+    USAGE_ANALYTICS = True
+    ERROR_REPORTING = True
+    METRICS_COLLECTION = True
+
+    # === БЕЗОПАСНОСТЬ ===
+    ENABLE_FILE_ENCRYPTION = True
+    REQUIRE_API_AUTHENTICATION = True
+    JWT_TOKEN_EXPIRY_HOURS = int(os.getenv('JWT_TOKEN_EXPIRY_HOURS', '24'))
+
+    # === КЭШИРОВАНИЕ ===
+    REDIS_ENABLED = True
+    REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    CACHE_TIMEOUT = int(os.getenv('CACHE_TIMEOUT', '3600'))  # 1 час
+
+    # === БАЗА ДАННЫХ ===
+    DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://localhost/video_translator_commercial')
+    DATABASE_POOL_SIZE = int(os.getenv('DATABASE_POOL_SIZE', '10'))
+
+    # === УВЕДОМЛЕНИЯ ===
+    EMAIL_NOTIFICATIONS = True
+    SMTP_SERVER = os.getenv('SMTP_SERVER')
+    SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
+    SMTP_USERNAME = os.getenv('SMTP_USERNAME')
+    SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
+
+    # === WEBHOOK ИНТЕГРАЦИИ ===
+    WEBHOOK_SUPPORT = True
+    WEBHOOK_RETRY_ATTEMPTS = int(os.getenv('WEBHOOK_RETRY_ATTEMPTS', '3'))
+    WEBHOOK_TIMEOUT = int(os.getenv('WEBHOOK_TIMEOUT', '30'))
+
+    def __init__(self):
+        super().__init__()
+        # Коммерческие директории
+        self.COMMERCIAL_FOLDER = self.PROJECT_ROOT / "commercial"
+        self.LICENSES_FOLDER = self.COMMERCIAL_FOLDER / "licenses"
+        self.ANALYTICS_FOLDER = self.COMMERCIAL_FOLDER / "analytics"
+        self.BACKUP_FOLDER = self.COMMERCIAL_FOLDER / "backups"
+        self.create_commercial_directories()
+
+    def create_commercial_directories(self):
+        """Создание коммерческих директорий"""
+        commercial_dirs = [
+            self.COMMERCIAL_FOLDER,
+            self.LICENSES_FOLDER,
+            self.ANALYTICS_FOLDER,
+            self.BACKUP_FOLDER,
+        ]
+
+        for directory in commercial_dirs:
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                print(f"Предупреждение: Не удалось создать коммерческую директорию {directory}: {e}")
+
+    def get_commercial_config(self) -> Dict[str, Any]:
+        """Получение коммерческой конфигурации"""
+        return {
+            'licensing': {
+                'license_key_required': self.LICENSE_KEY_REQUIRED,
+                'usage_tracking': self.USAGE_TRACKING_ENABLED,
+            },
+            'performance': {
+                'max_concurrent_jobs': self.MAX_CONCURRENT_JOBS,
+                'batch_processing': self.ENABLE_BATCH_PROCESSING,
+                'batch_size': self.BATCH_SIZE,
+            },
+            'quality': {
+                'video_crf': self.VIDEO_CRF,
+                'audio_bitrate': self.AUDIO_BITRATE,
+                'audio_sample_rate': self.AUDIO_SAMPLE_RATE,
+            },
+            'monitoring': {
+                'performance_monitoring': self.PERFORMANCE_MONITORING,
+                'usage_analytics': self.USAGE_ANALYTICS,
+                'error_reporting': self.ERROR_REPORTING,
+            },
+            'integrations': {
+                'webhook_support': self.WEBHOOK_SUPPORT,
+                'email_notifications': self.EMAIL_NOTIFICATIONS,
+                'redis_caching': self.REDIS_ENABLED,
+            }
+        }
+
+
 class TestingConfig(Config):
     """Конфигурация для тестирования"""
     DEBUG = True
@@ -299,13 +443,14 @@ class TestingConfig(Config):
 def get_config(env: str = None) -> Config:
     """Фабрика конфигураций"""
     env = env or os.getenv('FLASK_ENV', 'development')
-    
+
     config_map = {
         'development': DevelopmentConfig,
         'production': ProductionConfig,
+        'commercial': CommercialConfig,
         'testing': TestingConfig,
     }
-    
+
     config_class = config_map.get(env, DevelopmentConfig)
     return config_class()
 

@@ -145,7 +145,8 @@ class SpeechSynthesizer:
             voice: str = None,
             speed: float = 1.0,
             pitch: float = 0.0,
-            target_duration: float = None
+            target_duration: float = None,
+            speaker_id: str = None
     ) -> Optional[str]:
         """
         Синтез речи с использованием ручного селектора TTS движков
@@ -169,7 +170,8 @@ class SpeechSynthesizer:
             language=language,
             engine=effective_engine,
             voice_name=effective_voice,
-            target_duration=target_duration
+            target_duration=target_duration,
+            speaker_id=speaker_id
         )
         
         if result:

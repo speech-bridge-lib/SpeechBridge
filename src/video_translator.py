@@ -30,6 +30,8 @@ from core import VideoProcessor, AudioProcessor, SpeechRecognizer, SpeechSynthes
 from core.speaker_diarization import SpeakerDiarization
 from core.video_time_adjuster import VideoTimeAdjuster
 from core.voice_activity_detector import VoiceActivityDetector
+from core.voice_cloner import VoiceCloner
+from core.tts_engine_factory import TTSEngineFactory
 from translator_compat import translate_text, get_translator_status, get_language_info
 from config import config
 
@@ -48,6 +50,13 @@ class VideoTranslator:
         self.speaker_diarization = SpeakerDiarization(config)
         self.video_adjuster = VideoTimeAdjuster(config)
         self.voice_activity_detector = VoiceActivityDetector()
+        
+        # Voice cloning integration
+        self.voice_cloner = VoiceCloner(config)
+        self.tts_factory = TTSEngineFactory()
+        
+        # Enable voice cloning in speaker diarization
+        self.speaker_diarization.enable_voice_cloning(self.voice_cloner)
 
         # Создание рабочих директорий
         self.config.create_directories()
@@ -1367,15 +1376,17 @@ class VideoTranslator:
 
                     # 3c. Синтез речи с учетом voice_id сегмента и target_duration для Google TTS
                     voice_id = segment.get('voice_id', None)  # Получаем назначенный голос
+                    speaker_id = segment.get('speaker', None)  # Получаем speaker_id для voice cloning
                     segment_duration = segment.get('duration', None)  # Длительность сегмента
-                    
-                    self.logger.info(f"🔍 TTS СИНТЕЗ {i + 1}: отправляем на синтез '{translated_text}' (язык: {target_language}, voice: {voice_id}, target_duration: {segment_duration}s)")
-                    
+
+                    self.logger.info(f"🔍 TTS СИНТЕЗ {i + 1}: отправляем на синтез '{translated_text}' (язык: {target_language}, voice: {voice_id}, speaker: {speaker_id}, target_duration: {segment_duration}s)")
+
                     tts_path = self.speech_synthesizer.synthesize_speech(
                         translated_text,
                         target_language,
                         voice=voice_id,
-                        target_duration=segment_duration  # Передаем длительность для Google TTS timing adjustment
+                        target_duration=segment_duration,  # Передаем длительность для Google TTS timing adjustment
+                        speaker_id=speaker_id  # Передаем speaker_id для voice cloning
                     )
                     
                     if tts_path:
@@ -2060,6 +2071,54 @@ def synthesize_speech(text: str, lang: str = 'ru', slow: bool = False) -> Option
     """Обратная совместимость: синтез речи"""
     translator = VideoTranslator()
     return translator.speech_synthesizer.synthesize_speech(text, lang)
+
+
+def translate_video(input_video: str, output_video: str, source_language: str = 'auto',
+                   target_language: str = 'ru', custom_output_dir: str = None,
+                   use_gpu: bool = True, preserve_original_audio: bool = False,
+                   generate_subtitles: bool = True, whisper_model: str = 'base',
+                   tts_engine: str = 'auto') -> bool:
+    """
+    Функция-обертка для обратной совместимости с фреймворком
+
+    Args:
+        input_video: Путь к входному видео
+        output_video: Путь к выходному видео
+        source_language: Исходный язык
+        target_language: Целевой язык
+        custom_output_dir: Папка для сохранения (не используется, совместимость)
+        use_gpu: Использовать GPU (передается в настройки)
+        preserve_original_audio: Сохранять оригинальное аудио
+        generate_subtitles: Генерировать субтитры
+        whisper_model: Модель Whisper
+        tts_engine: TTS движок
+
+    Returns:
+        bool: True если успешно, False если ошибка
+    """
+    try:
+        translator = VideoTranslator()
+
+        # Определяем формат вывода на основе параметра generate_subtitles
+        output_format = 'TRANSLATION_WITH_SUBTITLES' if generate_subtitles else 'TRANSLATION_ONLY'
+
+        # Вызываем метод класса с нужными параметрами
+        result = translator.translate_video(
+            video_path=input_video,
+            output_path=output_video,
+            source_language=source_language,
+            target_language=target_language,
+            whisper_model=whisper_model,
+            speech_engine='whisper',  # Принудительно используем whisper
+            output_format=output_format,  # Включаем субтитры
+            save_texts=True  # Сохраняем текстовые файлы
+        )
+
+        return result
+
+    except Exception as e:
+        print(f"Error in translate_video wrapper: {e}")
+        return False
 
 
 if __name__ == "__main__":
