@@ -36,7 +36,7 @@ class AudioSynchronizer:
         target_lang: str,
         total_duration: float,
         original_audio_path: Optional[str] = None
-    ) -> str:
+    ) -> tuple[str, List[Dict[str, Any]]]:
         """
         Synchronize translated audio segments with original timing
 
@@ -50,7 +50,7 @@ class AudioSynchronizer:
             original_audio_path: Path to original audio for silence detection
 
         Returns:
-            str: Path to synchronized audio file
+            tuple: (Path to synchronized audio file, Corrected segments with adjusted timing)
         """
         if len(segments) != len(translated_texts):
             raise ComponentException(
@@ -201,7 +201,7 @@ class AudioSynchronizer:
 
         self.logger.info(f"Synchronized audio created: {final_audio}")
 
-        return str(final_audio)
+        return str(final_audio), segments
 
     def _create_synchronized_audio(
         self,

@@ -186,6 +186,54 @@ class VideoTranslationPipeline:
                 f"{translation['source_lang']} -> {translation['target_lang']}"
             )
 
+            # Step 4.4: Correct segment timing for initial silence (if sync mode enabled)
+            # This ensures subtitles and TTS use corrected timing
+            if self.sync_audio and transcription.get('segments') and self.audio_sync:
+                actual_speech_start = 0.0
+                if audio_path.exists():
+                    # Detect actual speech start time
+                    import subprocess
+                    try:
+                        cmd = [
+                            'ffmpeg',
+                            '-i', str(audio_path),
+                            '-af', 'silencedetect=noise=-30dB:d=0.5',
+                            '-f', 'null',
+                            '-'
+                        ]
+                        result_proc = subprocess.run(
+                            cmd,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            timeout=60
+                        )
+
+                        # Parse output for first silence_end
+                        for line in result_proc.stderr.split('\n'):
+                            if 'silence_end:' in line:
+                                parts = line.split('silence_end:')[1].split('|')[0].strip()
+                                actual_speech_start = float(parts)
+                                break
+                    except Exception as e:
+                        self.logger.warning(f"Failed to detect speech start: {e}")
+
+                # Correct first segment timing if needed
+                if actual_speech_start > 0 and transcription['segments']:
+                    if transcription['segments'][0]['start'] < actual_speech_start - 0.5:
+                        self.logger.info(
+                            f"Correcting initial silence: {actual_speech_start:.2f}s "
+                            f"(Whisper reported: {transcription['segments'][0]['start']:.2f}s)"
+                        )
+                        # Adjust first segment start time
+                        old_start = transcription['segments'][0]['start']
+                        transcription['segments'][0]['start'] = actual_speech_start
+
+                        # Log the correction
+                        self.logger.debug(
+                            f"First segment corrected: {old_start:.2f}s -> {actual_speech_start:.2f}s"
+                        )
+
             # Step 4.5: Generate subtitles if requested
             subtitle_files = []
             if self.generate_subtitles or self.subtitle_only:
@@ -330,7 +378,7 @@ class VideoTranslationPipeline:
                 sync_dir = self.temp_dir / f"sync_{datetime.now().timestamp()}"
                 sync_dir.mkdir(exist_ok=True)
 
-                synced_audio = self.audio_sync.synchronize_segments(
+                synced_audio, corrected_segments = self.audio_sync.synchronize_segments(
                     transcription['segments'],
                     translation['segments'],
                     str(sync_dir),
@@ -339,6 +387,9 @@ class VideoTranslationPipeline:
                     video_info['duration'],
                     original_audio_path=str(audio_path)  # Pass original audio for silence detection
                 )
+
+                # Update transcription segments with corrected timing for subtitle generation
+                transcription['segments'] = corrected_segments
 
                 # Copy synchronized audio to expected path
                 import shutil
