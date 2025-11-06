@@ -88,6 +88,54 @@ segments_timing.txt
 *.pt
 *.ckpt
 
-# Documentation
+# Documentation (keep only README.md and docs in framework)
 *.rtf
 *.docx
+*_README.md
+*_GUIDE.md
+*_FIX.md
+*_PLAN.md
+*_REPORT.md
+*_DOCUMENTATION.md
+*_QUICKSTART.md
+*_SOLUTION.md
+*_IMPLEMENTATION.md
+Big_Video_Transcript.txt
+full_translation_*.txt
+
+# Subtitle files (temporary outputs)
+*.srt
+*.vtt
+
+# Old code (legacy)
+src/
+Utils/
+web/
+/templates/
+framework/
+
+# Commercial/production code (not for public framework)
+*commercial*.py
+production_*.py
+advanced_*.py
+setup_commercial.py
+requirements_commercial.txt
+
+# CLI binaries
+speechbridge-cli
+
+# Embedded subtitles scripts
+embed_*.py
+embed_*.sh
+
+# Test configuration
+pytest.ini
+
+# Legacy modules
+src/commercial_api.py
+src/commercial_demo.py
+src/core/api_manager.py
+src/core/batch_processor.py
+src/core/licensing.py
+src/core/monitoring.py
+src/core/voice_cloner.py

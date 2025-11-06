@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Translation - SpeechBridge</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎬 Video Translation Studio</h1>
+            <p class="subtitle">Translate your videos with AI-powered speech synthesis</p>
+        </header>
+
+        <main>
+            <!-- Upload Form -->
+            <div class="card" id="upload-section">
+                <h2>Upload Video</h2>
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="video-file">Select Video File</label>
+                        <div class="file-upload">
+                            <input type="file" id="video-file" name="video" accept="video/*" required>
+                            <label for="video-file" class="file-label">
+                                <span id="file-name">Choose a file or drag here</span>
+                            </label>
+                        </div>
+                        <small>Supported formats: MP4, MOV, AVI, MKV, WebM, FLV, WMV (max 500MB)</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="target-lang">Target Language</label>
+                            <select id="target-lang" name="target_lang" required>
+                                {% for code, name in languages.items() %}
+                                <option value="{{ code }}" {% if code == 'ru' %}selected{% endif %}>{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="whisper-model">Whisper Model</label>
+                            <select id="whisper-model" name="whisper_model" required>
+                                {% for model in models %}
+                                <option value="{{ model }}" {% if model == 'tiny' %}selected{% endif %}>{{ model|title }}</option>
+                                {% endfor %}
+                            </select>
+                            <small>Larger models = better quality but slower</small>
+                        </div>
+                    </div>
+
+                    <div class="options-group">
+                        <h3>Options</h3>
+                        <div class="checkbox-group">
+                            <label>
+                                <input type="checkbox" name="sync_audio" id="sync-audio" checked>
+                                <span>Sync Audio (match timing with original)</span>
+                            </label>
+                            <label>
+                                <input type="checkbox" name="generate_subtitles" id="generate-subtitles" checked>
+                                <span>Generate Subtitles</span>
+                            </label>
+                            <label>
+                                <input type="checkbox" name="embed_subtitles" id="embed-subtitles" checked>
+                                <span>Embed Subtitles in Video</span>
+                            </label>
+                            <label>
+                                <input type="checkbox" name="subtitle_only" id="subtitle-only">
+                                <span>Subtitle Only (no audio translation)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <span>Start Translation</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Progress Section -->
+            <div class="card" id="progress-section" style="display: none;">
+                <h2>Translation Progress</h2>
+                <div class="progress-info">
+                    <p id="progress-text">Initializing...</p>
+                    <div class="spinner"></div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </div>
+
+            <!-- Result Section -->
+            <div class="card" id="result-section" style="display: none;">
+                <h2>Translation Complete!</h2>
+                <div class="result-info">
+                    <p id="result-message">Your video has been successfully translated.</p>
+                    <div class="result-actions">
+                        <a href="#" id="download-btn" class="btn btn-success" download>
+                            Download Translated Video
+                        </a>
+                        <button id="new-translation-btn" class="btn btn-secondary">
+                            Translate Another Video
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Section -->
+            <div class="card error-card" id="error-section" style="display: none;">
+                <h2>Error</h2>
+                <p id="error-message"></p>
+                <button id="retry-btn" class="btn btn-primary">Try Again</button>
+            </div>
+
+            <!-- Jobs History -->
+            <div class="card" id="jobs-section">
+                <h2>Recent Translations</h2>
+                <div id="jobs-list">
+                    <p class="no-jobs">No translations yet</p>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Powered by SpeechBridge | OpenAI Whisper | DeepL | Edge TTS</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
