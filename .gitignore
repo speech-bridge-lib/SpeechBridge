@@ -93,6 +93,7 @@ segments_timing.txt
 *.docx
 *_README.md
 *_GUIDE.md
+!PYPI_PUBLICATION_GUIDE.md
 *_FIX.md
 *_PLAN.md
 *_REPORT.md

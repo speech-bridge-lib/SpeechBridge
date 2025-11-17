@@ -66,7 +66,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'speechbridge=speechbridge.cli.main:main',
+            'speechbridge=speechbridge.cli.main:cli',
         ],
     },
     include_package_data=True,
