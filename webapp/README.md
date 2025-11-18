@@ -1,58 +1,58 @@
 # Video Translation Web Application
 
-Веб-приложение для перевода видео с AI-синтезом речи и субтитрами.
+Web application for video translation with AI speech synthesis and subtitles.
 
-## Возможности
+## Features
 
-- 🎬 Загрузка видео через браузер (drag & drop)
-- 🌍 Поддержка 30+ языков (через DeepL API)
-- 🎙️ AI-синтез речи (Edge TTS)
-- 📝 Генерация и встраивание субтитров
-- ⏱️ Синхронизация аудио с оригинальным тайм-кодом
-- 📊 Отслеживание прогресса в реальном времени
-- 💾 Скачивание переведенных видео
+- Upload videos via browser (drag & drop)
+- Support for 30+ languages (via DeepL API)
+- AI speech synthesis (Edge TTS)
+- Subtitle generation and embedding
+- Audio synchronization with original timing
+- Real-time progress tracking
+- Download translated videos
 
-## Установка
+## Installation
 
-### 1. Установите зависимости Flask:
+### 1. Install Flask dependencies:
 
 ```bash
 pip install -r webapp/requirements.txt
 ```
 
-### 2. Установите основные зависимости проекта:
+### 2. Install main project dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Настройте DeepL API ключ:
+### 3. Configure DeepL API key:
 
-**Важно для безопасности:** Не храните API ключ в коде!
+**Important for security:** Do not store API keys in code!
 
-**Вариант 1 (рекомендуется): Использование .env файла**
+**Option 1 (recommended): Using .env file**
 
 ```bash
-# Скопируйте пример файла
+# Copy the example file
 cp .env.example .env
 
-# Отредактируйте .env и укажите ваш API ключ
+# Edit .env and add your API key
 # DEEPL_API_KEY=your-actual-api-key-here
 ```
 
-**Вариант 2: Переменная окружения**
+**Option 2: Environment variable**
 
 ```bash
 export DEEPL_API_KEY="your-deepl-api-key-here"
 ```
 
-**Получить API ключ:** https://www.deepl.com/pro-api
+**Get API key:** https://www.deepl.com/pro-api
 
-> **Примечание:** Файл `.env` уже добавлен в `.gitignore` и не будет загружен на GitHub
+> **Note:** The `.env` file is already added to `.gitignore` and will not be uploaded to GitHub
 
-## Запуск
+## Running
 
-### Простой запуск:
+### Simple run:
 
 ```bash
 cd webapp
@@ -60,9 +60,9 @@ export DEEPL_API_KEY="your-api-key"
 python app.py
 ```
 
-Приложение будет доступно по адресу: **http://localhost:5000**
+The application will be available at: **http://localhost:5000**
 
-### Запуск в продакшене (с Gunicorn):
+### Production run (with Gunicorn):
 
 ```bash
 pip install gunicorn
@@ -71,63 +71,63 @@ cd webapp
 gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```
 
-## Использование
+## Usage
 
-1. **Откройте браузер** и перейдите на http://localhost:5000
+1. **Open browser** and go to http://localhost:5000
 
-2. **Загрузите видео**:
-   - Нажмите на область загрузки или перетащите файл
-   - Поддерживаемые форматы: MP4, MOV, AVI, MKV, WebM, FLV, WMV
-   - Максимальный размер: 500 МБ
+2. **Upload video**:
+   - Click on the upload area or drag and drop a file
+   - Supported formats: MP4, MOV, AVI, MKV, WebM, FLV, WMV
+   - Maximum size: 500 MB
 
-3. **Настройте параметры**:
-   - **Target Language**: Целевой язык перевода (русский по умолчанию)
-   - **Whisper Model**: Модель распознавания речи (tiny/base/small/medium/large)
-     - `tiny` - быстрая, но менее точная
-     - `large` - медленная, но максимально точная
+3. **Configure parameters**:
+   - **Target Language**: Target translation language (Russian by default)
+   - **Whisper Model**: Speech recognition model (tiny/base/small/medium/large)
+     - `tiny` - fast but less accurate
+     - `large` - slow but most accurate
 
-   **Опции**:
-   - ✅ **Sync Audio**: Синхронизировать длительность переведенной речи с оригиналом
-   - ✅ **Generate Subtitles**: Создать файлы субтитров (.srt)
-   - ✅ **Embed Subtitles**: Встроить субтитры в видео
-   - ☐ **Subtitle Only**: Только субтитры (без перевода аудио)
+   **Options**:
+   - **Sync Audio**: Synchronize translated speech duration with original
+   - **Generate Subtitles**: Create subtitle files (.srt)
+   - **Embed Subtitles**: Embed subtitles in video
+   - **Subtitle Only**: Subtitles only (no audio translation)
 
-4. **Запустите перевод**:
-   - Нажмите "Start Translation"
-   - Отслеживайте прогресс в реальном времени
-   - После завершения скачайте результат
+4. **Start translation**:
+   - Click "Start Translation"
+   - Track progress in real-time
+   - Download result when complete
 
-## Структура проекта
+## Project Structure
 
 ```
 webapp/
-├── app.py                 # Flask приложение (backend)
-├── requirements.txt       # Python зависимости
-├── README.md             # Документация
+├── app.py                 # Flask application (backend)
+├── requirements.txt       # Python dependencies
+├── README.md             # Documentation
 ├── static/
 │   ├── css/
-│   │   └── style.css     # Стили интерфейса
+│   │   └── style.css     # Interface styles
 │   └── js/
-│       └── app.js        # Frontend логика
+│       └── app.js        # Frontend logic
 ├── templates/
-│   └── index.html        # HTML шаблон
-├── uploads/              # Загруженные видео (создается автоматически)
-└── outputs/              # Переведенные видео (создается автоматически)
+│   └── index.html        # HTML template
+├── uploads/              # Uploaded videos (created automatically)
+└── outputs/              # Translated videos (created automatically)
 ```
 
 ## API Endpoints
 
 ### POST /upload
-Загрузка видео и запуск перевода.
+Upload video and start translation.
 
 **Form Data**:
-- `video`: Файл видео
-- `target_lang`: Целевой язык (например, "ru")
-- `whisper_model`: Модель Whisper ("tiny", "base", "small", "medium", "large")
-- `sync_audio`: "true" или "false"
-- `generate_subtitles`: "true" или "false"
-- `embed_subtitles`: "true" или "false"
-- `subtitle_only`: "true" или "false"
+- `video`: Video file
+- `target_lang`: Target language (e.g., "ru")
+- `whisper_model`: Whisper model ("tiny", "base", "small", "medium", "large")
+- `sync_audio`: "true" or "false"
+- `generate_subtitles`: "true" or "false"
+- `embed_subtitles`: "true" or "false"
+- `subtitle_only`: "true" or "false"
 
 **Response**:
 ```json
@@ -139,7 +139,7 @@ webapp/
 ```
 
 ### GET /status/<job_id>
-Проверка статуса перевода.
+Check translation status.
 
 **Response**:
 ```json
@@ -152,10 +152,10 @@ webapp/
 ```
 
 ### GET /download/<job_id>
-Скачивание переведенного видео.
+Download translated video.
 
 ### GET /jobs
-Список всех переводов.
+List all translations.
 
 **Response**:
 ```json
@@ -178,41 +178,41 @@ Finnish, French, Hungarian, Indonesian, Italian, Japanese, Korean, Lithuanian,
 Latvian, Norwegian, Dutch, Polish, Portuguese, Romanian, Russian, Slovak,
 Slovenian, Swedish, Turkish, Ukrainian, Chinese
 
-## Технологии
+## Technologies
 
 - **Backend**: Flask, Python 3.10+
 - **Frontend**: Vanilla JavaScript, HTML5, CSS3
 - **AI/ML**:
-  - OpenAI Whisper (транскрипция)
-  - DeepL API (перевод)
-  - Edge TTS (синтез речи)
+  - OpenAI Whisper (transcription)
+  - DeepL API (translation)
+  - Edge TTS (speech synthesis)
 - **Video**: FFmpeg
 
-## Примечания
+## Notes
 
-- Процесс перевода может занять несколько минут в зависимости от длины видео и выбранной модели Whisper
-- Для длинных видео рекомендуется использовать модель `tiny` или `base`
-- Убедитесь, что у вас достаточно места на диске для загруженных и переведенных видео
-- Переведенные видео хранятся в папке `outputs/`
-- При перезапуске сервера история переводов теряется (jobs хранятся в памяти)
+- Translation process may take several minutes depending on video length and selected Whisper model
+- For long videos, it is recommended to use the `tiny` or `base` model
+- Make sure you have enough disk space for uploaded and translated videos
+- Translated videos are stored in the `outputs/` folder
+- Translation history is lost on server restart (jobs are stored in memory)
 
-## Возможные улучшения
+## Future Improvements
 
-- [ ] База данных для хранения истории переводов
-- [ ] Аутентификация пользователей
-- [ ] WebSocket для real-time обновления прогресса
-- [ ] Поддержка batch-обработки нескольких видео
-- [ ] Превью видео в браузере
-- [ ] Управление очередью заданий
-- [ ] Автоматическая очистка старых файлов
-- [ ] Docker контейнеризация
+- [ ] Database for storing translation history
+- [ ] User authentication
+- [ ] WebSocket for real-time progress updates
+- [ ] Support for batch processing of multiple videos
+- [ ] Video preview in browser
+- [ ] Job queue management
+- [ ] Automatic cleanup of old files
+- [ ] Docker containerization
 - [ ] API rate limiting
-- [ ] Логирование и мониторинг
+- [ ] Logging and monitoring
 
-## Лицензия
+## License
 
 MIT License
 
-## Поддержка
+## Support
 
-Для вопросов и предложений создавайте issues в репозитории проекта.
+For questions and suggestions, create issues in the project repository.
