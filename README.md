@@ -2,6 +2,7 @@
 
 **Modular Python framework for video translation with AI-powered speech synthesis and subtitle generation.**
 
+[![PyPI version](https://badge.fury.io/py/speechbridge.svg)](https://pypi.org/project/speechbridge/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -265,7 +266,7 @@ Contributions are welcome! Please:
 
 ## Roadmap
 
-- [ ] Register on PyPI
+- [x] Register on PyPI
 - [ ] Support for additional TTS providers (Google TTS, ElevenLabs)
 - [ ] Voice cloning capabilities
 - [ ] Batch processing multiple videos
