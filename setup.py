@@ -6,13 +6,13 @@ SpeechBridge Framework Setup
 from setuptools import setup, find_packages
 from pathlib import Path
 
-# Читаем README
+# Read README
 readme_file = Path(__file__).parent / "README.md"
 long_description = ""
 if readme_file.exists():
     long_description = readme_file.read_text(encoding='utf-8')
 
-# Читаем requirements
+# Read requirements
 requirements_file = Path(__file__).parent / "requirements.txt"
 requirements = []
 if requirements_file.exists():
@@ -22,7 +22,7 @@ if requirements_file.exists():
             if line.strip() and not line.startswith('#')
         ]
 
-# Версия
+# Version
 version_file = Path(__file__).parent / "speechbridge" / "__version__.py"
 version = "1.0.0"
 if version_file.exists():
@@ -32,12 +32,12 @@ if version_file.exists():
 setup(
     name="speechbridge",
     version=version,
-    author="SpeechBridge Development Team",
-    author_email="dev@speechbridge.com",
+    author="Andrey Kolpakov",
+    author_email="speech.bridge.lib@gmail.com",
     description="Modular framework for automated video translation with GPU support",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/your-org/speechbridge",
+    url="https://github.com/speech-bridge-lib/speechbridge",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
