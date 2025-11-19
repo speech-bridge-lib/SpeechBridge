@@ -5,6 +5,7 @@
 [![PyPI version](https://badge.fury.io/py/speechbridge.svg)](https://pypi.org/project/speechbridge/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![DOI](https://zenodo.org/badge/1099076527.svg)](https://doi.org/10.5281/zenodo.17650387)
 
 ## Features
 
