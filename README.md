@@ -287,7 +287,7 @@ Contributions are welcome! Please:
 If you use SpeechBridge in your research or project, please cite:
 
 ```bibtex
-@software{speechbridge2024,
+@software{speechbridge2025,
   author       = {Kolpakov Andrey},
   title        = {SpeechBridge: A Unified Python Library for Speech API Integration},
   year         = 2025,
@@ -295,8 +295,8 @@ If you use SpeechBridge in your research or project, please cite:
   version      = {1.0.0},
   doi          = {10.5281/zenodo.17650387},
   url          = {https://doi.org/10.5281/zenodo.17650387}
-}
-\```
+} 
+`````
 
 ## License
 
