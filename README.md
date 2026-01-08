@@ -282,6 +282,22 @@ Contributions are welcome! Please:
 - [ ] API rate limiting and quota management
 - [ ] Multi-speaker detection and voice mapping
 
+## Citation
+
+If you use SpeechBridge in your research or project, please cite:
+
+```bibtex
+@software{speechbridge2024,
+  author       = {Kolpakov Andrey},
+  title        = {SpeechBridge: A Unified Python Library for Speech API Integration},
+  year         = 2025,
+  publisher    = {Zenodo},
+  version      = {1.0.0},
+  doi          = {10.5281/zenodo.17650387},
+  url          = {https://doi.org/10.5281/zenodo.17650387}
+}
+
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

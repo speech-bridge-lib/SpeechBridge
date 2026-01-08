@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: "Kolpakov"
+    given-names: "Andrey"
+    orcid: "https://orcid.org/0009-0004-8678-077X"
+title: "SpeechBridge: Modular Python framework for video translation with AI-powered speech synthesis and subtitle generation"
+version: 1.0.0  
+date-released: 2025-11-19  
+url: "https://github.com/speech-bridge-lib/SpeechBridge"
+repository-code: "https://github.com/speech-bridge-lib/SpeechBridge"
+doi: 10.5281/zenodo.17650387
+license: MIT
+keywords:
+  - speech recognition
+  - speech synthesis
+  - API integration
+  - video translation
+  - Python
