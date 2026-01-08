@@ -296,7 +296,7 @@ If you use SpeechBridge in your research or project, please cite:
   doi          = {10.5281/zenodo.17650387},
   url          = {https://doi.org/10.5281/zenodo.17650387}
 }
-
+\```
 
 ## License
 
